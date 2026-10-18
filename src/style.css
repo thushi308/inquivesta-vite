@@ -18,8 +18,12 @@
 *::after {
   box-sizing: border-box;
 }
+
+/* The window is the scroller, so mobile browsers can collapse the address bar */
 html {
-  scroll-behavior: auto;
+  scroll-behavior: auto; /* smooth scrolling fights scroll-snap */
+  scroll-snap-type: y mandatory; /* use "proximity" for a looser feel */
+  overscroll-behavior-y: none;
 }
 body {
   margin: 0;
@@ -28,29 +32,29 @@ body {
   font-family: var(--font-mono);
   -webkit-font-smoothing: antialiased;
 }
+
 main {
-  position: relative;
-  height: 100vh;
-  height: 100dvh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scroll-snap-type: y mandatory;
+  position: relative; /* no height / overflow: the document scrolls */
 }
+
+/* ---------- Card stacking ---------- */
 .panel {
   position: sticky;
   top: 0;
   width: 100%;
-  height: 100vh;
-  height: 100dvh;
+  height: 100vh; /* fallback */
+  height: 100lvh; /* stable height = full screen once the address bar hides */
   transform-origin: center top;
   will-change: transform, filter;
 }
-/* each panel is a "card" sliding over the previous one */
+/* each later panel is a "card" sliding over the previous one */
 .panel + .panel {
+  /* border-radius: 24px 24px 0 0; */
   overflow: hidden;
   box-shadow: 0 -12px 40px rgb(0 0 0 / 0.45);
 }
-/* invisible, non-sticky snap targets: one per screen */
+
+/* Invisible, non-sticky snap targets: one <span> per section */
 .snap-points {
   position: absolute;
   inset: 0 auto auto 0;
@@ -60,10 +64,11 @@ main {
 .snap-points span {
   display: block;
   height: 100vh;
-  height: 100dvh;
+  height: 100lvh;
   scroll-snap-align: start;
   scroll-snap-stop: always;
 }
+
 img {
   display: block;
   max-width: 100%;
@@ -190,10 +195,9 @@ button {
 
 /* ---------- Hero ---------- */
 .hero {
-  min-height: 100svh;
   display: grid;
   place-items: center;
-  background: var(--navy);
+  background: var(--navy); /* panels must stay opaque */
   padding: 0 16px;
 }
 .hero__title {
@@ -220,9 +224,6 @@ button {
 
 /* ---------- Pronite (background art laid out in the 412x917 design space, scaled to cover) ---------- */
 .pronite {
-  /* position: relative; */
-  /* min-height: 100svh; */
-  height: 100vh;
   background: var(--plum);
   overflow: hidden;
   display: flex;
@@ -323,9 +324,6 @@ button {
 
 /* ---------- Stats ---------- */
 .stats {
-  /* position: relative; */
-  /* min-height: 100svh; */
-  height: 100vh;
   background: var(--navy);
   overflow: hidden;
   display: grid;
@@ -433,9 +431,6 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
   .menu {
     --dur: 0s;
   }

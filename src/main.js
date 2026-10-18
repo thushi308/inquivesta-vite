@@ -46,23 +46,22 @@ next.addEventListener("click", () => go(1));
 prev.disabled = next.disabled = slides.length < 2;
 renderSlide();
 
-/* ---------- Card stacking depth effect ---------- */
-const scroller = document.querySelector("main");
+/* ---------- Card stacking depth effect (window scroll) ---------- */
 const panels = [...document.querySelectorAll(".panel")];
 let ticking = false;
 
 function updateStack() {
-  const vh = scroller.clientHeight;
+  const h = panels[0].offsetHeight; // stable because panels use lvh
   panels.forEach((panel, i) => {
-    if (i === panels.length - 1) return; // top card never gets covered
-    const t = Math.min(Math.max((scroller.scrollTop - i * vh) / vh, 0), 1);
+    if (i === panels.length - 1) return;
+    const t = Math.min(Math.max((window.scrollY - i * h) / h, 0), 1);
     panel.style.transform = `scale(${1 - 0.06 * t})`;
     panel.style.filter = `brightness(${1 - 0.5 * t})`;
   });
   ticking = false;
 }
 
-scroller.addEventListener(
+window.addEventListener(
   "scroll",
   () => {
     if (!ticking) {
