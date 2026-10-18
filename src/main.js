@@ -16,7 +16,9 @@ function setMenu(open) {
 }
 menuBtn.addEventListener("click", () => setMenu(menu.dataset.open !== "true"));
 menuClose.addEventListener("click", () => setMenu(false));
-document.querySelector(".header__logo").addEventListener("click", () => setMenu(false));
+document
+  .querySelector(".header__logo")
+  .addEventListener("click", () => setMenu(false));
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && menu.dataset.open === "true") setMenu(false);
 });
@@ -43,3 +45,32 @@ prev.addEventListener("click", () => go(-1));
 next.addEventListener("click", () => go(1));
 prev.disabled = next.disabled = slides.length < 2;
 renderSlide();
+
+/* ---------- Card stacking depth effect ---------- */
+const scroller = document.querySelector("main");
+const panels = [...document.querySelectorAll(".panel")];
+let ticking = false;
+
+function updateStack() {
+  const vh = scroller.clientHeight;
+  panels.forEach((panel, i) => {
+    if (i === panels.length - 1) return; // top card never gets covered
+    const t = Math.min(Math.max((scroller.scrollTop - i * vh) / vh, 0), 1);
+    panel.style.transform = `scale(${1 - 0.06 * t})`;
+    panel.style.filter = `brightness(${1 - 0.5 * t})`;
+  });
+  ticking = false;
+}
+
+scroller.addEventListener(
+  "scroll",
+  () => {
+    if (!ticking) {
+      ticking = true;
+      requestAnimationFrame(updateStack);
+    }
+  },
+  { passive: true },
+);
+window.addEventListener("resize", updateStack);
+updateStack();

@@ -4,14 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#171932" />
-    <meta name="description" content="Inquivesta: join others throughout the night at Pronite." />
+    <meta
+      name="description"
+      content="Inquivesta: join others throughout the night at Pronite."
+    />
     <title>Inquivesta</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- One <link> per family so an unavailable family can't break the others -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amita:wght@700&display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alumni+Sans+SC:wght@700&display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Iosevka+Charon+Mono:wght@400&display=swap" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Amita:wght@700&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Alumni+Sans+SC:wght@700&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Iosevka+Charon+Mono:wght@400&display=swap"
+    />
   </head>
   <body>
     <header class="header">
@@ -19,12 +31,40 @@
         <img src="/images/logo.svg" alt="" width="43" height="43" />
       </a>
 
-      <button type="button" class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="site-menu">
-        <svg class="menu-btn__bars" width="34" height="26" viewBox="0 0 34 26" fill="none" aria-hidden="true">
-          <g stroke="#fff" stroke-width="3.5"><path d="M0 3h34" /><path d="M0 13h34" /><path d="M0 23h34" /></g>
+      <button
+        type="button"
+        class="menu-btn"
+        id="menu-btn"
+        aria-label="Open menu"
+        aria-expanded="false"
+        aria-controls="site-menu"
+      >
+        <svg
+          class="menu-btn__bars"
+          width="34"
+          height="26"
+          viewBox="0 0 34 26"
+          fill="none"
+          aria-hidden="true"
+        >
+          <g stroke="#fff" stroke-width="3.5">
+            <path d="M0 3h34" />
+            <path d="M0 13h34" />
+            <path d="M0 23h34" />
+          </g>
         </svg>
-        <svg class="menu-btn__x" width="34" height="26" viewBox="0 0 34 26" fill="none" aria-hidden="true">
-          <g stroke="#fff" stroke-width="3.5"><path d="M5 1.5l24 23" /><path d="M29 1.5L5 24.5" /></g>
+        <svg
+          class="menu-btn__x"
+          width="34"
+          height="26"
+          viewBox="0 0 34 26"
+          fill="none"
+          aria-hidden="true"
+        >
+          <g stroke="#fff" stroke-width="3.5">
+            <path d="M5 1.5l24 23" />
+            <path d="M29 1.5L5 24.5" />
+          </g>
         </svg>
       </button>
 
@@ -32,9 +72,19 @@
         <div class="mandala">
           <!-- Replace this file (PNG, or an SVG with links later) to change the menu art -->
           <img class="mandala__art" src="/images/menu-mandala.png" alt="" />
-          <button type="button" class="mandala__close" id="menu-close" aria-label="Close menu">
+          <button
+            type="button"
+            class="mandala__close"
+            id="menu-close"
+            aria-label="Close menu"
+          >
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M5 5l14 14M19 5L5 19" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" />
+              <path
+                d="M5 5l14 14M19 5L5 19"
+                stroke="currentColor"
+                stroke-width="2.4"
+                stroke-linecap="round"
+              />
             </svg>
           </button>
         </div>
@@ -42,14 +92,24 @@
     </header>
 
     <main>
-      <section id="home" class="hero">
+      <section id="home" class="hero panel">
         <h1 class="hero__title">INQUIVESTA</h1>
       </section>
 
-      <section id="pronite" class="pronite">
+      <section id="pronite" class="pronite panel">
         <div class="pronite__bg" aria-hidden="true">
-          <img class="pronite__dancer1" src="/images/fire-dancer-1.png" alt="" loading="lazy" />
-          <img class="pronite__dancer2" src="/images/fire-dancer-2.png" alt="" loading="lazy" />
+          <img
+            class="pronite__dancer1"
+            src="/images/fire-dancer-1.png"
+            alt=""
+            loading="lazy"
+          />
+          <img
+            class="pronite__dancer2"
+            src="/images/fire-dancer-2.png"
+            alt=""
+            loading="lazy"
+          />
           <div class="pronite__shade"></div>
         </div>
         <div class="pronite__content">
@@ -58,10 +118,20 @@
             <p class="pronite__desc">Join others through out the night!</p>
             <p class="pronite__name" id="pronite-name" aria-live="polite"></p>
             <div class="pronite__arrows">
-              <button type="button" class="pronite__arrow" id="pronite-prev" aria-label="Previous">
+              <button
+                type="button"
+                class="pronite__arrow"
+                id="pronite-prev"
+                aria-label="Previous"
+              >
                 <img src="/images/arrow-2.svg" alt="" class="flip" />
               </button>
-              <button type="button" class="pronite__arrow" id="pronite-next" aria-label="Next">
+              <button
+                type="button"
+                class="pronite__arrow"
+                id="pronite-next"
+                aria-label="Next"
+              >
                 <img src="/images/arrow-1.svg" alt="" />
               </button>
             </div>
@@ -70,7 +140,7 @@
         </div>
       </section>
 
-      <section id="stats" class="stats">
+      <section id="stats" class="stats panel">
         <img class="stats__bg" src="/images/castle.png" alt="" loading="lazy" />
         <div class="stats__shade"></div>
         <!-- The design has no labels under the figures; replace with real values -->
@@ -81,6 +151,10 @@
           <li class="stats__item">100+</li>
         </ul>
       </section>
+      <!-- Snap targets must NOT be sticky (a pinned element is always "at the start"), so they live separately -->
+      <div class="snap-points" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
     </main>
 
     <script type="module" src="/src/main.js"></script>
