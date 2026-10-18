@@ -363,6 +363,11 @@ button {
 
 /* ---------- Tablet ---------- */
 @media (min-width: 600px) {
+  .pronite__bg {
+    scale: 0.75;
+    transform: rotate(20deg);
+    translate: 120px -30px;
+  }
   .pronite__content {
     padding: 120px 56px 56px;
   }
@@ -381,6 +386,11 @@ button {
     left: calc(50vw - var(--d) / 2);
   } /* centred; edit here for off-centre */
 
+  .pronite__bg {
+    scale: 0.6;
+    transform: rotate(50deg);
+    translate: 200px 0;
+  }
   .pronite__content {
     flex-direction: row;
     align-items: center;
