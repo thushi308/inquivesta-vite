@@ -1,4 +1,6 @@
 import "./style.css";
+import burn0 from "./transitions/burn0.glsl?raw";
+import { createGLTransition } from "./gl-transition.js";
 
 const base = import.meta.env.BASE_URL; // "/" in dev, "/static/" in the Django build
 
@@ -42,20 +44,55 @@ const next = document.getElementById("special-next");
 let index = 0;
 let revealed = false;
 
-/* Transition between the two faces. Crossfade is pure CSS, driven by
-   data-revealed. To switch to gl-transitions later, add another function with
-   the same (card, revealed) signature here and point runTransition at it. */
+/* Transition between the two faces.
+   - burn: gl-transitions "burn0" (author: liubailin2020), drawn on a canvas
+     over the card, used when WebGL is available and motion is allowed.
+   - crossfade: pure CSS fallback, driven by data-revealed.
+   To try another gl-transition, drop its .glsl in src/transitions/ and swap the import. */
+const glCanvas = document.createElement("canvas");
+glCanvas.className = "special__gl";
+glCanvas.setAttribute("aria-hidden", "true");
+cardEl.insertBefore(glCanvas, captionEl); // above the photos, below the caption
+
+const gl = createGLTransition(glCanvas, burn0, { burnColor: [1.0, 0.5, 0.0] });
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+let running = null;
+
+function cancelRunning() {
+  running?.cancel();
+  running = null;
+  delete cardEl.dataset.animating;
+}
+const ready = (img) => img.complete && img.naturalWidth > 0;
+
 const transitions = {
   crossfade(card, showArtist) {
+    cancelRunning();
     card.dataset.revealed = String(showArtist);
   },
+  burn(card, showArtist) {
+    const [fromImg, toImg] = showArtist
+      ? [eventImg, artistImg]
+      : [artistImg, eventImg];
+    if (!gl || reduceMotion.matches || !ready(fromImg) || !ready(toImg)) {
+      return transitions.crossfade(card, showArtist);
+    }
+    cancelRunning();
+    card.dataset.animating = "true"; // shows the canvas
+    const job = gl.run(fromImg, toImg, { duration: 1200 });
+    running = job;
+    // faces swap underneath the canvas; the caption fades in on top of it
+    card.dataset.revealed = String(showArtist);
+    job.done.then(() => {
+      if (running === job) cancelRunning();
+    });
+  },
 };
-const runTransition = transitions.crossfade;
 
-function setRevealed(value) {
+function setRevealed(value, animate = true) {
   revealed = value;
   const s = specialEvents[index];
-  runTransition(cardEl, revealed);
+  (animate ? transitions.burn : transitions.crossfade)(cardEl, revealed);
   cardEl.setAttribute("aria-pressed", String(revealed));
   cardEl.setAttribute(
     "aria-label",
@@ -75,7 +112,7 @@ function renderSlide() {
   artistImg.src = base + s.artist.image;
   artistImg.alt = `${s.artist.name}, artist at ${s.title}`;
   captionEl.textContent = s.artist.name; // name overlaid on the photo
-  setRevealed(false); // each event starts on its event image
+  setRevealed(false, false); // each event starts on its event image, no burn
 }
 function go(d) {
   index = (index + d + specialEvents.length) % specialEvents.length;

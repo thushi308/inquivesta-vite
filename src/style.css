@@ -336,6 +336,18 @@ button {
 .special__card[data-revealed="true"] .special__face--artist {
   opacity: 1;
 }
+/* Canvas for the gl-transition; only visible while a transition plays */
+.special__gl {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  pointer-events: none;
+}
+.special__card[data-animating="true"] .special__gl {
+  display: block;
+}
 /* Artist name overlaid on the photo */
 .special__caption {
   position: absolute;
