@@ -1,5 +1,5 @@
 /* Minimal gl-transitions runner (https://github.com/gl-transitions/gl-transitions).
-   Give it a canvas and a transition's GLSL source; run(fromImg, toImg) plays it. */
+   One canvas, any number of transitions. run(name, fromImg, toImg, opts) plays one. */
 
 const VERT = `
 attribute vec2 position;
@@ -37,20 +37,10 @@ function compile(gl, type, src) {
   return sh;
 }
 
-/** Returns null when WebGL or the shader is unavailable (caller should fall back). */
-export function createGLTransition(canvas, glsl, uniforms = {}) {
+/** defs: { name: { glsl, uniforms? } }. Returns null when WebGL is unavailable. */
+export function createGLTransitions(canvas, defs) {
   const gl = canvas.getContext("webgl", { premultipliedAlpha: false });
   if (!gl) return null;
-
-  const vs = compile(gl, gl.VERTEX_SHADER, VERT);
-  const fs = compile(gl, gl.FRAGMENT_SHADER, fragment(glsl));
-  if (!vs || !fs) return null;
-  const prog = gl.createProgram();
-  gl.attachShader(prog, vs);
-  gl.attachShader(prog, fs);
-  gl.linkProgram(prog);
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return null;
-  gl.useProgram(prog);
 
   const buf = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, buf);
@@ -59,20 +49,8 @@ export function createGLTransition(canvas, glsl, uniforms = {}) {
     new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
     gl.STATIC_DRAW,
   );
-  const loc = gl.getAttribLocation(prog, "position");
-  gl.enableVertexAttribArray(loc);
-  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 
-  const u = (name) => gl.getUniformLocation(prog, name);
-  gl.uniform1i(u("from"), 0);
-  gl.uniform1i(u("to"), 1);
-  for (const [name, v] of Object.entries(uniforms)) {
-    if (typeof v === "number") gl.uniform1f(u(name), v);
-    else if (v.length === 3) gl.uniform3fv(u(name), v);
-    else if (v.length === 2) gl.uniform2fv(u(name), v);
-  }
-
-  const makeTexture = (unit) => {
+  const textures = [0, 1].map((unit) => {
     const t = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0 + unit);
     gl.bindTexture(gl.TEXTURE_2D, t);
@@ -81,11 +59,39 @@ export function createGLTransition(canvas, glsl, uniforms = {}) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     return t;
-  };
-  makeTexture(0);
-  makeTexture(1);
+  });
 
-  // Rasterise an <img> with object-fit: cover so it matches what the card shows
+  const programs = new Map();
+  for (const [name, def] of Object.entries(defs)) {
+    const vs = compile(gl, gl.VERTEX_SHADER, VERT);
+    const fs = compile(gl, gl.FRAGMENT_SHADER, fragment(def.glsl));
+    if (!vs || !fs) continue;
+    const prog = gl.createProgram();
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      console.error(`gl-transition "${name}" failed to link`);
+      continue;
+    }
+    gl.useProgram(prog);
+    const u = (n) => gl.getUniformLocation(prog, n);
+    gl.uniform1i(u("from"), 0);
+    gl.uniform1i(u("to"), 1);
+    for (const [n, v] of Object.entries(def.uniforms ?? {})) {
+      if (typeof v === "number") gl.uniform1f(u(n), v);
+      else if (v.length === 3) gl.uniform3fv(u(n), v);
+      else if (v.length === 2) gl.uniform2fv(u(n), v);
+    }
+    programs.set(name, {
+      prog,
+      position: gl.getAttribLocation(prog, "position"),
+      progress: u("progress"),
+      ratio: u("ratio"),
+    });
+  }
+
+  // Rasterise an image with object-fit: cover so it matches what the card shows
   const scratch = document.createElement("canvas");
   const upload = (unit, img, w, h) => {
     scratch.width = w;
@@ -94,9 +100,9 @@ export function createGLTransition(canvas, glsl, uniforms = {}) {
     const s = Math.max(w / img.naturalWidth, h / img.naturalHeight);
     const dw = img.naturalWidth * s;
     const dh = img.naturalHeight * s;
-    ctx.clearRect(0, 0, w, h);
     ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
     gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, textures[unit]);
     gl.texImage2D(
       gl.TEXTURE_2D,
       0,
@@ -107,13 +113,21 @@ export function createGLTransition(canvas, glsl, uniforms = {}) {
     );
   };
 
-  const draw = (p) => {
-    gl.uniform1f(u("progress"), p);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-  };
+  let cancelCurrent = null;
 
-  /** Plays the transition; `done` resolves true when finished, false if cancelled. */
-  function run(fromImg, toImg, { duration = 1400 } = {}) {
+  /** Plays a transition from fromImg to toImg.
+      opts.reverse plays the same transition backwards (progress 1 -> 0, images swapped).
+      `done` resolves true when finished, false if cancelled. */
+  function run(
+    name,
+    fromImg,
+    toImg,
+    { duration = 1400, reverse = false } = {},
+  ) {
+    const p = programs.get(name);
+    if (!p) throw new Error(`Unknown gl-transition "${name}"`);
+    cancelCurrent?.();
+
     const box = canvas.parentElement.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const w = Math.max(1, Math.round(box.width * dpr));
@@ -121,9 +135,23 @@ export function createGLTransition(canvas, glsl, uniforms = {}) {
     canvas.width = w;
     canvas.height = h;
     gl.viewport(0, 0, w, h);
-    gl.uniform1f(u("ratio"), w / h);
-    upload(0, fromImg, w, h);
-    upload(1, toImg, w, h);
+
+    gl.useProgram(p.prog);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.enableVertexAttribArray(p.position);
+    gl.vertexAttribPointer(p.position, 2, gl.FLOAT, false, 0, 0);
+    gl.uniform1f(p.ratio, w / h);
+
+    // Reversed: B -> A with progress running 1 -> 0 looks like A -> B played backwards
+    const [a, b] = reverse ? [toImg, fromImg] : [fromImg, toImg];
+    upload(0, a, w, h);
+    upload(1, b, w, h);
+
+    const draw = (t) => {
+      const e = easeInOut(t);
+      gl.uniform1f(p.progress, reverse ? 1 - e : e);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    };
     draw(0); // first frame matches what was on screen: no flash
 
     let cancelled = false;
@@ -133,19 +161,19 @@ export function createGLTransition(canvas, glsl, uniforms = {}) {
       const tick = (now) => {
         if (cancelled) return resolve(false);
         const t = Math.min((now - t0) / duration, 1);
-        draw(easeInOut(t));
+        draw(t);
         if (t < 1) raf = requestAnimationFrame(tick);
         else resolve(true);
       };
       raf = requestAnimationFrame(tick);
-      run.cancelCurrent = () => {
+      cancelCurrent = () => {
         cancelled = true;
         cancelAnimationFrame(raf);
         resolve(false);
       };
     });
-    return { done, cancel: () => run.cancelCurrent() };
+    return { done, cancel: () => cancelCurrent?.() };
   }
 
-  return { run };
+  return { run, has: (name) => programs.has(name) };
 }

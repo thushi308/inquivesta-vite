@@ -1,6 +1,6 @@
 import "./style.css";
-import burn0 from "./transitions/burn0.glsl?raw";
-import { createGLTransition } from "./gl-transition.js";
+import { createGLTransitions } from "./gl-transition.js";
+import { transitionDefs } from "./transitions/index.js";
 
 const base = import.meta.env.BASE_URL; // "/" in dev, "/static/" in the Django build
 
@@ -32,6 +32,20 @@ window.addEventListener("keydown", (e) => {
 
 import { specialEvents } from "./special-events-data.js";
 
+/* ---------- Transition settings (change these) ----------
+   name:     a key from src/transitions/index.js
+   duration: milliseconds
+   reverse:  true = play that transition backwards
+   reveal = card click (event image <-> artist photo)
+   next / prev = the arrows (event -> event)
+   "prev" below is the same shader as "next" played backwards. */
+const TRANSITIONS = {
+  reveal: { name: "burn0", duration: 1400, reverse: false },
+  next: { name: "burn0", duration: 1400, reverse: false }, // placeholder: swap in the new transition
+  prev: { name: "burn0", duration: 1400, reverse: true },
+};
+
+const textEl = document.querySelector(".special__text");
 const titleEl = document.getElementById("special-title");
 const descEl = document.getElementById("special-desc");
 const nameEl = document.getElementById("special-name");
@@ -43,56 +57,90 @@ const prev = document.getElementById("special-prev");
 const next = document.getElementById("special-next");
 let index = 0;
 let revealed = false;
+let eventBusy = false; // ignore clicks while an event-to-event transition plays
 
-/* Transition between the two faces.
-   - burn: gl-transitions "burn0" (author: liubailin2020), drawn on a canvas
-     over the card, used when WebGL is available and motion is allowed.
-   - crossfade: pure CSS fallback, driven by data-revealed.
-   To try another gl-transition, drop its .glsl in src/transitions/ and swap the import. */
+/* Preload every image so transitions can start instantly */
+const imageCache = new Map();
+function loadImage(src) {
+  if (!imageCache.has(src)) {
+    imageCache.set(
+      src,
+      new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      }),
+    );
+  }
+  return imageCache.get(src);
+}
+specialEvents.forEach((s) => {
+  loadImage(base + s.image).catch(() => {});
+  loadImage(base + s.artist.image).catch(() => {});
+});
+
+/* ---------- GL transitions (CSS crossfade is the fallback) ---------- */
 const glCanvas = document.createElement("canvas");
 glCanvas.className = "special__gl";
 glCanvas.setAttribute("aria-hidden", "true");
 cardEl.insertBefore(glCanvas, captionEl); // above the photos, below the caption
 
-const gl = createGLTransition(glCanvas, burn0, { burnColor: [1.0, 0.5, 0.0] });
+const gl = createGLTransitions(glCanvas, transitionDefs);
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 let running = null;
+
+const ready = (img) => img.complete && img.naturalWidth > 0;
+const canUseGL = (cfg) => gl && gl.has(cfg.name) && !reduceMotion.matches;
 
 function cancelRunning() {
   running?.cancel();
   running = null;
   delete cardEl.dataset.animating;
 }
-const ready = (img) => img.complete && img.naturalWidth > 0;
+/* Shows the canvas, plays the transition, hides the canvas when done */
+function play(cfg, fromImg, toImg) {
+  cancelRunning();
+  cardEl.dataset.animating = "true";
+  const job = gl.run(cfg.name, fromImg, toImg, cfg);
+  running = job;
+  job.done.then(() => {
+    if (running === job) cancelRunning();
+  });
+  return job;
+}
 
-const transitions = {
-  crossfade(card, showArtist) {
-    cancelRunning();
-    card.dataset.revealed = String(showArtist);
-  },
-  burn(card, showArtist) {
-    const [fromImg, toImg] = showArtist
-      ? [eventImg, artistImg]
-      : [artistImg, eventImg];
-    if (!gl || reduceMotion.matches || !ready(fromImg) || !ready(toImg)) {
-      return transitions.crossfade(card, showArtist);
-    }
-    cancelRunning();
-    card.dataset.animating = "true"; // shows the canvas
-    const job = gl.run(fromImg, toImg, { duration: 1200 });
-    running = job;
-    // faces swap underneath the canvas; the caption fades in on top of it
-    card.dataset.revealed = String(showArtist);
-    job.done.then(() => {
-      if (running === job) cancelRunning();
-    });
-  },
-};
+/* Title / description / artist line fade out, swap at the midpoint, fade in */
+let textTimer = 0;
+function swapText(duration, update) {
+  const half = duration / 2;
+  textEl.style.setProperty("--swap-dur", `${half}ms`);
+  textEl.dataset.swapping = "true";
+  clearTimeout(textTimer);
+  textTimer = setTimeout(() => {
+    update();
+    textEl.dataset.swapping = "false";
+  }, half);
+}
 
-function setRevealed(value, animate = true) {
-  revealed = value;
+/* ---------- Rendering ---------- */
+function applyImages() {
   const s = specialEvents[index];
-  (animate ? transitions.burn : transitions.crossfade)(cardEl, revealed);
+  eventImg.src = base + s.image;
+  eventImg.alt = s.title;
+  artistImg.src = base + s.artist.image;
+  artistImg.alt = `${s.artist.name}, artist at ${s.title}`;
+  captionEl.textContent = s.artist.name; // name overlaid on the photo
+}
+function applyText() {
+  const s = specialEvents[index];
+  titleEl.textContent = s.title;
+  descEl.textContent = s.description;
+  nameEl.textContent = revealed ? s.artist.name : ""; // name under the description
+  updateCardLabel();
+}
+function updateCardLabel() {
+  const s = specialEvents[index];
   cardEl.setAttribute("aria-pressed", String(revealed));
   cardEl.setAttribute(
     "aria-label",
@@ -100,26 +148,69 @@ function setRevealed(value, animate = true) {
       ? `Showing artist ${s.artist.name}. Show ${s.title} image`
       : `Show artist for ${s.title}`,
   );
-  nameEl.textContent = revealed ? s.artist.name : ""; // name under the description
+}
+function renderSlide() {
+  cancelRunning();
+  revealed = false;
+  cardEl.dataset.revealed = "false";
+  applyImages();
+  applyText();
 }
 
-function renderSlide() {
-  const s = specialEvents[index];
-  titleEl.textContent = s.title;
-  descEl.textContent = s.description;
-  eventImg.src = base + s.image;
-  eventImg.alt = `${s.title}`;
-  artistImg.src = base + s.artist.image;
-  artistImg.alt = `${s.artist.name}, artist at ${s.title}`;
-  captionEl.textContent = s.artist.name; // name overlaid on the photo
-  setRevealed(false, false); // each event starts on its event image, no burn
+/* ---------- Card click: event image <-> artist photo ---------- */
+function setRevealed(value) {
+  if (eventBusy) return;
+  const cfg = TRANSITIONS.reveal;
+  revealed = value;
+  const [fromImg, toImg] = revealed
+    ? [eventImg, artistImg]
+    : [artistImg, eventImg];
+  if (canUseGL(cfg) && ready(fromImg) && ready(toImg)) {
+    play(cfg, fromImg, toImg); // faces swap underneath the canvas
+  } else {
+    cancelRunning(); // CSS crossfade
+  }
+  cardEl.dataset.revealed = String(revealed);
+  nameEl.textContent = revealed ? specialEvents[index].artist.name : "";
+  updateCardLabel();
 }
-function go(d) {
-  index = (index + d + specialEvents.length) % specialEvents.length;
-  renderSlide();
+
+/* ---------- Arrows: event -> event ---------- */
+async function changeEvent(d) {
+  if (eventBusy) return;
+  const newIndex = (index + d + specialEvents.length) % specialEvents.length;
+  const cfg = d > 0 ? TRANSITIONS.next : TRANSITIONS.prev;
+  const fromImg = revealed ? artistImg : eventImg; // whatever is showing now
+
+  let toImg = null;
+  if (canUseGL(cfg) && ready(fromImg)) {
+    eventBusy = true;
+    try {
+      toImg = await loadImage(base + specialEvents[newIndex].image);
+    } catch {
+      toImg = null;
+    }
+  }
+  if (!toImg) {
+    index = newIndex;
+    renderSlide();
+    eventBusy = false;
+    return;
+  }
+
+  const job = play(cfg, fromImg, toImg); // textures are captured synchronously
+  index = newIndex;
+  revealed = false;
+  cardEl.dataset.revealed = "false";
+  applyImages(); // swapped underneath the canvas
+  swapText(cfg.duration, applyText);
+  job.done.then(() => {
+    eventBusy = false;
+  });
 }
-prev.addEventListener("click", () => go(-1));
-next.addEventListener("click", () => go(1));
+
+prev.addEventListener("click", () => changeEvent(-1));
+next.addEventListener("click", () => changeEvent(1));
 cardEl.addEventListener("click", () => setRevealed(!revealed));
 prev.disabled = next.disabled = specialEvents.length < 2;
 renderSlide();

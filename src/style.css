@@ -336,6 +336,16 @@ button {
 .special__card[data-revealed="true"] .special__face--artist {
   opacity: 1;
 }
+/* Title / description / artist line fade while the event changes */
+.special__title,
+.special__desc,
+.special__name {
+  transition: opacity var(--swap-dur, 0.3s) ease;
+}
+.special__text[data-swapping="true"]
+  :is(.special__title, .special__desc, .special__name) {
+  opacity: 0;
+}
 /* Canvas for the gl-transition; only visible while a transition plays */
 .special__gl {
   position: absolute;
