@@ -151,9 +151,17 @@
           <li class="stats__item">100+</li>
         </ul>
       </section>
+      <section id="timeline" class="timeline panel" aria-label="Timeline">
+        <div class="river" id="river">
+          <canvas class="river__canvas" aria-hidden="true"></canvas>
+          <div class="river__boat" aria-hidden="true">
+            <img class="river__boat-img" src="/images/boat.svg" alt="" />
+          </div>
+        </div>
+      </section>
       <!-- Snap targets must NOT be sticky (a pinned element is always "at the start"), so they live separately -->
       <div class="snap-points" aria-hidden="true">
-        <span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span>
       </div>
     </main>
 

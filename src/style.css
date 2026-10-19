@@ -361,6 +361,66 @@ button {
   color: #fff;
 }
 
+/* ---------- Timeline ----------*/
+.timeline {
+  background: var(--navy);
+}
+
+.river {
+  position: absolute;
+  inset: 0;
+  /* THE width variable, plus the colours */
+  --river-width: 44px;
+  --river-bank-width: 8px;
+  --river-water: #2f86c9;
+  --river-deep: #2570ad;
+  --river-foam: #d8f1ff;
+  --river-sand: #f0c36a;
+  --river-outline: #14405f;
+  --boat-size: 64px;
+}
+@media (min-width: 900px) {
+  .river {
+    --river-width: 64px;
+    --river-bank-width: 10px;
+    --boat-size: 88px;
+  }
+}
+.river__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.river__boat {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--boat-size);
+  pointer-events: none;
+  will-change: transform;
+}
+.river__boat-img {
+  width: 100%;
+  height: auto;
+  animation: boat-bob 3.2s ease-in-out infinite;
+}
+@keyframes boat-bob {
+  0%,
+  100% {
+    transform: translateY(-2px) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(2px) rotate(2deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .river__boat-img {
+    animation: none;
+  }
+}
+
 /* ---------- Tablet ---------- */
 @media (min-width: 600px) {
   .pronite__bg {
