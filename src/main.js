@@ -23,27 +23,68 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && menu.dataset.open === "true") setMenu(false);
 });
 
-/* ---------- Pronite carousel (add more entries to enable the arrows) ---------- */
-const slides = [{ name: "Mohammad Irfan", image: "images/rock-concert.png" }];
-const nameEl = document.getElementById("pronite-name");
-const imgEl = document.getElementById("pronite-img");
-const prev = document.getElementById("pronite-prev");
-const next = document.getElementById("pronite-next");
+/* ---------- Special events carousel ----------
+   Arrows move between events. Clicking the card crossfades between the
+   event image and that event's artist photo (click again to go back).
+   Image paths are relative to /public. */
+
+import { specialEvents } from "./special-events-data.js";
+
+const titleEl = document.getElementById("special-title");
+const descEl = document.getElementById("special-desc");
+const nameEl = document.getElementById("special-name");
+const cardEl = document.getElementById("special-card");
+const eventImg = document.getElementById("special-event-img");
+const artistImg = document.getElementById("special-artist-img");
+const captionEl = document.getElementById("special-caption");
+const prev = document.getElementById("special-prev");
+const next = document.getElementById("special-next");
 let index = 0;
+let revealed = false;
+
+/* Transition between the two faces. Crossfade is pure CSS, driven by
+   data-revealed. To switch to gl-transitions later, add another function with
+   the same (card, revealed) signature here and point runTransition at it. */
+const transitions = {
+  crossfade(card, showArtist) {
+    card.dataset.revealed = String(showArtist);
+  },
+};
+const runTransition = transitions.crossfade;
+
+function setRevealed(value) {
+  revealed = value;
+  const s = specialEvents[index];
+  runTransition(cardEl, revealed);
+  cardEl.setAttribute("aria-pressed", String(revealed));
+  cardEl.setAttribute(
+    "aria-label",
+    revealed
+      ? `Showing artist ${s.artist.name}. Show ${s.title} image`
+      : `Show artist for ${s.title}`,
+  );
+  nameEl.textContent = revealed ? s.artist.name : ""; // name under the description
+}
 
 function renderSlide() {
-  const s = slides[index];
-  nameEl.textContent = s.name;
-  imgEl.src = base + s.image;
-  imgEl.alt = `Pronite performance, ${s.name}`;
+  const s = specialEvents[index];
+  titleEl.textContent = s.title;
+  descEl.textContent = s.description;
+  eventImg.src = base + s.image;
+  eventImg.alt = `${s.title}`;
+  artistImg.src = base + s.artist.image;
+  artistImg.alt = `${s.artist.name}, artist at ${s.title}`;
+  captionEl.textContent = s.artist.name; // name overlaid on the photo
+  setRevealed(false); // each event starts on its event image
 }
 function go(d) {
-  index = (index + d + slides.length) % slides.length;
+  index = (index + d + specialEvents.length) % specialEvents.length;
   renderSlide();
 }
 prev.addEventListener("click", () => go(-1));
 next.addEventListener("click", () => go(1));
-prev.disabled = next.disabled = slides.length < 2;
+cardEl.addEventListener("click", () => setRevealed(!revealed));
+prev.disabled = next.disabled = specialEvents.length < 2;
 renderSlide();
 
 /* ---------- Card stacking depth effect (window scroll) ---------- */

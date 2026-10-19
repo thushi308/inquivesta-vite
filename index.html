@@ -96,47 +96,78 @@
         <h1 class="hero__title">INQUIVESTA</h1>
       </section>
 
-      <section id="pronite" class="pronite panel">
-        <div class="pronite__bg" aria-hidden="true">
+      <section
+        id="special-events"
+        class="special panel"
+        aria-label="Special events"
+      >
+        <div class="special__bg" aria-hidden="true">
           <img
-            class="pronite__dancer1"
+            class="special__dancer1"
             src="/images/fire-dancer-1.png"
             alt=""
             loading="lazy"
           />
           <img
-            class="pronite__dancer2"
+            class="special__dancer2"
             src="/images/fire-dancer-2.png"
             alt=""
             loading="lazy"
           />
         </div>
-        <div class="pronite__shade"></div>
-        <div class="pronite__content">
-          <div class="pronite__text">
-            <h2 class="pronite__title">Pronite</h2>
-            <p class="pronite__desc">Join others through out the night!</p>
-            <p class="pronite__name" id="pronite-name" aria-live="polite"></p>
-            <div class="pronite__arrows">
+        <div class="special__shade"></div>
+        <div class="special__content">
+          <div class="special__text">
+            <h2
+              class="special__title"
+              id="special-title"
+              aria-live="polite"
+            ></h2>
+            <p class="special__desc" id="special-desc"></p>
+            <p class="special__name" id="special-name" aria-live="polite"></p>
+            <div class="special__arrows">
               <button
                 type="button"
-                class="pronite__arrow"
-                id="pronite-prev"
-                aria-label="Previous"
+                class="special__arrow"
+                id="special-prev"
+                aria-label="Previous event"
               >
                 <img src="/images/arrow-2.svg" alt="" class="flip" />
               </button>
               <button
                 type="button"
-                class="pronite__arrow"
-                id="pronite-next"
-                aria-label="Next"
+                class="special__arrow"
+                id="special-next"
+                aria-label="Next event"
               >
                 <img src="/images/arrow-1.svg" alt="" />
               </button>
             </div>
           </div>
-          <div class="pronite__card"><img id="pronite-img" alt="" /></div>
+          <!-- Click to crossfade between the event image and the artist photo -->
+          <button
+            type="button"
+            class="special__card"
+            id="special-card"
+            data-revealed="false"
+            aria-pressed="false"
+          >
+            <img
+              class="special__face special__face--event"
+              id="special-event-img"
+              alt=""
+            />
+            <img
+              class="special__face special__face--artist"
+              id="special-artist-img"
+              alt=""
+            />
+            <span
+              class="special__caption"
+              id="special-caption"
+              aria-hidden="true"
+            ></span>
+          </button>
         </div>
       </section>
 
