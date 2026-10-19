@@ -76,15 +76,23 @@ updateStack();
 
 /* ----------- timeline ----------------------------------------------*/
 import { createRiver } from "./river.js";
+import { createEvents } from "./river-events.js";
 import { portrait, landscape } from "./river-path.js";
+import { START, END, events } from "./timeline-data.js";
 
-const debug = parseFloat(new URLSearchParams(location.search).get("river")); // ?river=0.5 to test
+const debug = parseFloat(new URLSearchParams(location.search).get("river"));
+
+const markers = createEvents(document.getElementById("river-events"), events, {
+  start: START,
+  end: END,
+});
 
 export const river = createRiver(document.getElementById("river"), {
   portrait,
   landscape,
-  start: "2026-11-01T00:00:00", // placeholder: the event start
-  end: "2027-01-01T00:00:00", // placeholder: the event end
-  boatFacing: 0, // direction the boat artwork points: 0 = right, 90 = down
+  start: START,
+  end: END,
+  boatFacing: 0,
   progress: Number.isNaN(debug) ? undefined : debug,
+  onLayout: (api) => markers.layout(api), // re-place markers after every resize
 });

@@ -406,6 +406,101 @@ button {
   height: auto;
   animation: boat-bob 3.2s ease-in-out infinite;
 }
+.river__events {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+.event {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+.event__dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 18px;
+  height: 18px;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: var(--navy);
+  border: 3px solid var(--river-foam);
+  box-shadow: 0 0 0 3px var(--river-outline);
+}
+.event.is-past .event__dot {
+  background: var(--river-sand);
+}
+.event.is-next .event__dot {
+  animation: event-pulse 1.8s ease-out infinite;
+}
+@keyframes event-pulse {
+  from {
+    box-shadow:
+      0 0 0 3px var(--river-outline),
+      0 0 0 3px rgb(253 174 44 / 0.8);
+  }
+  to {
+    box-shadow:
+      0 0 0 3px var(--river-outline),
+      0 0 0 16px rgb(253 174 44 / 0);
+  }
+}
+
+.event__label {
+  position: absolute;
+  width: max-content;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgb(23 25 50 / 0.85);
+  border: 1px solid rgb(255 255 255 / 0.18);
+}
+.event[data-side="right"] .event__label {
+  left: var(--off);
+  top: 0;
+  translate: 0 -50%;
+}
+.event[data-side="left"] .event__label {
+  right: var(--off);
+  top: 0;
+  translate: 0 -50%;
+}
+.event[data-side="top"] .event__label {
+  bottom: var(--off);
+  left: 0;
+  translate: -50% 0;
+}
+.event[data-side="bottom"] .event__label {
+  top: var(--off);
+  left: 0;
+  translate: -50% 0;
+}
+
+.event__date {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+.event__title {
+  margin: 2px 0 0;
+  font: 700 16px/1.2 var(--font-mono);
+}
+@media (min-width: 900px) {
+  .event__title {
+    font-size: 20px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .event.is-next .event__dot {
+    animation: none;
+  }
+}
 @keyframes boat-bob {
   0%,
   100% {
