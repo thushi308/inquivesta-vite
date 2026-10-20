@@ -1,6 +1,8 @@
 import "./style.css";
 import { createGLTransitions } from "./gl-transition.js";
 import { transitionDefs } from "./transitions/index.js";
+import { createTransitionStage } from "./gl-stage.js";
+import { rasterizeSpecial } from "./special-raster.js";
 
 const base = import.meta.env.BASE_URL; // "/" in dev, "/static/" in the Django build
 
@@ -26,8 +28,10 @@ window.addEventListener("keydown", (e) => {
 });
 
 /* ---------- Special events carousel ----------
-   Arrows move between events. Clicking the card crossfades between the
-   event image and that event's artist photo (click again to go back).
+   Arrows:     the WHOLE section (background, card, text, arrows) transitions to the
+               next event on its own canvas (sceneStage).
+   Card click: event image <-> artist photo on a separate canvas inside the card
+               (cardStage).
    Image paths are relative to /public. */
 
 import { specialEvents } from "./special-events-data.js";
@@ -37,15 +41,14 @@ import { specialEvents } from "./special-events-data.js";
    duration: milliseconds
    reverse:  true = play that transition backwards
    reveal = card click (event image <-> artist photo)
-   next / prev = the arrows (event -> event)
-   "prev" below is the same shader as "next" played backwards. */
+   next / prev = the arrows (whole section -> next/previous event) */
 const TRANSITIONS = {
-  reveal: { name: "burn0", duration: 1400, reverse: false },
-  next: { name: "burn0", duration: 1400, reverse: false }, // placeholder: swap in the new transition
+  reveal: { name: "customVideo", duration: 1500, reverse: false },
+  next: { name: "customVideo", duration: 1400, reverse: false }, // placeholder: swap in the new transition
   prev: { name: "burn0", duration: 1400, reverse: true },
 };
 
-const textEl = document.querySelector(".special__text");
+const sectionEl = document.getElementById("special-events");
 const titleEl = document.getElementById("special-title");
 const descEl = document.getElementById("special-desc");
 const nameEl = document.getElementById("special-name");
@@ -80,48 +83,28 @@ specialEvents.forEach((s) => {
   loadImage(base + s.artist.image).catch(() => {});
 });
 
-/* ---------- GL transitions (CSS crossfade is the fallback) ---------- */
-const glCanvas = document.createElement("canvas");
-glCanvas.className = "special__gl";
-glCanvas.setAttribute("aria-hidden", "true");
-cardEl.insertBefore(glCanvas, captionEl); // above the photos, below the caption
+/* ---------- Two separate GL canvases (CSS crossfade is the fallback) ---------- */
+// each stage only compiles the transitions it actually uses
+const pick = (defs, names) =>
+  Object.fromEntries(names.filter((n) => defs[n]).map((n) => [n, defs[n]]));
 
-const gl = createGLTransitions(glCanvas, transitionDefs);
+// canvas inside the card: event image <-> artist photo
+const cardStage = createTransitionStage(
+  cardEl,
+  pick(transitionDefs, [TRANSITIONS.reveal.name]),
+  { className: "special__gl", before: captionEl },
+);
+// canvas over the whole section: event -> event
+const sceneStage = createTransitionStage(
+  sectionEl,
+  pick(transitionDefs, [TRANSITIONS.next.name, TRANSITIONS.prev.name]),
+  { className: "special__scene-gl", zIndex: 5 },
+);
+
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
-let running = null;
-
 const ready = (img) => img.complete && img.naturalWidth > 0;
-const canUseGL = (cfg) => gl && gl.has(cfg.name) && !reduceMotion.matches;
-
-function cancelRunning() {
-  running?.cancel();
-  running = null;
-  delete cardEl.dataset.animating;
-}
-/* Shows the canvas, plays the transition, hides the canvas when done */
-function play(cfg, fromImg, toImg) {
-  cancelRunning();
-  cardEl.dataset.animating = "true";
-  const job = gl.run(cfg.name, fromImg, toImg, cfg);
-  running = job;
-  job.done.then(() => {
-    if (running === job) cancelRunning();
-  });
-  return job;
-}
-
-/* Title / description / artist line fade out, swap at the midpoint, fade in */
-let textTimer = 0;
-function swapText(duration, update) {
-  const half = duration / 2;
-  textEl.style.setProperty("--swap-dur", `${half}ms`);
-  textEl.dataset.swapping = "true";
-  clearTimeout(textTimer);
-  textTimer = setTimeout(() => {
-    update();
-    textEl.dataset.swapping = "false";
-  }, half);
-}
+const canUseGL = (stage, cfg) =>
+  Boolean(stage?.has(cfg.name)) && !reduceMotion.matches;
 
 /* ---------- Rendering ---------- */
 function applyImages() {
@@ -150,14 +133,15 @@ function updateCardLabel() {
   );
 }
 function renderSlide() {
-  cancelRunning();
+  cardStage?.cancel();
+  sceneStage?.cancel();
   revealed = false;
   cardEl.dataset.revealed = "false";
   applyImages();
   applyText();
 }
 
-/* ---------- Card click: event image <-> artist photo ---------- */
+/* ---------- Card click: event image <-> artist photo (cardStage) ---------- */
 function setRevealed(value) {
   if (eventBusy) return;
   const cfg = TRANSITIONS.reveal;
@@ -165,48 +149,70 @@ function setRevealed(value) {
   const [fromImg, toImg] = revealed
     ? [eventImg, artistImg]
     : [artistImg, eventImg];
-  if (canUseGL(cfg) && ready(fromImg) && ready(toImg)) {
-    play(cfg, fromImg, toImg); // faces swap underneath the canvas
+  if (canUseGL(cardStage, cfg) && ready(fromImg) && ready(toImg)) {
+    cardStage.play(cfg.name, fromImg, toImg, cfg); // faces swap underneath the canvas
   } else {
-    cancelRunning(); // CSS crossfade
+    cardStage?.cancel(); // CSS crossfade
   }
   cardEl.dataset.revealed = String(revealed);
   nameEl.textContent = revealed ? specialEvents[index].artist.name : "";
   updateCardLabel();
 }
 
-/* ---------- Arrows: event -> event ---------- */
+/* ---------- Arrows: whole section -> next event (sceneStage) ---------- */
 async function changeEvent(d) {
   if (eventBusy) return;
   const newIndex = (index + d + specialEvents.length) % specialEvents.length;
   const cfg = d > 0 ? TRANSITIONS.next : TRANSITIONS.prev;
-  const fromImg = revealed ? artistImg : eventImg; // whatever is showing now
-
-  let toImg = null;
-  if (canUseGL(cfg) && ready(fromImg)) {
-    eventBusy = true;
-    try {
-      toImg = await loadImage(base + specialEvents[newIndex].image);
-    } catch {
-      toImg = null;
-    }
-  }
-  if (!toImg) {
+  if (!canUseGL(sceneStage, cfg)) {
     index = newIndex;
     renderSlide();
-    eventBusy = false;
     return;
   }
 
-  const job = play(cfg, fromImg, toImg); // textures are captured synchronously
-  index = newIndex;
-  revealed = false;
-  cardEl.dataset.revealed = "false";
-  applyImages(); // swapped underneath the canvas
-  swapText(cfg.duration, applyText);
-  job.done.then(() => {
+  eventBusy = true;
+  try {
+    const cur = specialEvents[index];
+    const nxt = specialEvents[newIndex];
+    const [cEvent, cArtist, nEvent, nArtist] = await Promise.all([
+      loadImage(base + cur.image),
+      loadImage(base + cur.artist.image),
+      loadImage(base + nxt.image),
+      loadImage(base + nxt.artist.image),
+      document.fonts.ready, // canvas text needs the web fonts
+    ]);
+
+    cardStage?.cancel(); // stop a card transition still in progress
+    // 1. snapshot what is on screen now
+    const from = rasterizeSpecial(sectionEl, {
+      eventImg: cEvent,
+      artistImg: cArtist,
+      revealed,
+    });
+    // 2. switch the page to the next event (hidden under the canvas), snapshot that
+    index = newIndex;
+    revealed = false;
+    cardEl.dataset.revealed = "false";
+    applyImages();
+    applyText();
+    const to = rasterizeSpecial(sectionEl, {
+      eventImg: nEvent,
+      artistImg: nArtist,
+      revealed: false,
+    });
+    // 3. play: all in the same frame, so nothing flashes
+    sceneStage.play(cfg.name, from, to, cfg).done.then(() => {
+      eventBusy = false;
+    });
+  } catch (err) {
+    console.error(
+      "[special-events] event transition failed, swapping instantly",
+      err,
+    );
+    index = newIndex;
+    renderSlide();
     eventBusy = false;
-  });
+  }
 }
 
 prev.addEventListener("click", () => changeEvent(-1));

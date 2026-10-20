@@ -64,8 +64,20 @@ function makeVideo(src) {
   return el;
 }
 
-/** defs: { name: { glsl, uniforms? } }. Returns null when WebGL is unavailable. */
-export function createGLTransitions(canvas, defs) {
+/** Canvas pixel size for an element: layout size (ignores CSS transforms) x devicePixelRatio (max 2).
+    Exported so a rasteriser can draw its texture at exactly the size the runner uses. */
+export function pixelSize(el) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  return {
+    w: Math.max(1, Math.round(el.offsetWidth * dpr)),
+    h: Math.max(1, Math.round(el.offsetHeight * dpr)),
+  };
+}
+
+/** defs: { name: { glsl, uniforms? } }. Returns null when WebGL is unavailable.
+    opts.sizeEl: element whose size the canvas follows (default: the canvas's parent).
+    Sources passed to run() can be <img>, <video> or <canvas>. */
+export function createGLTransitions(canvas, defs, { sizeEl } = {}) {
   const gl = canvas.getContext("webgl", { premultipliedAlpha: false });
   if (!gl) return null;
 
@@ -148,8 +160,8 @@ export function createGLTransitions(canvas, defs) {
   // Rasterise an image or video frame with object-fit: cover so it matches what the card shows
   const scratch = document.createElement("canvas");
   const upload = (unit, src, w, h) => {
-    const srcW = src.videoWidth || src.naturalWidth;
-    const srcH = src.videoHeight || src.naturalHeight;
+    const srcW = src.videoWidth || src.naturalWidth || src.width; // img | video | canvas
+    const srcH = src.videoHeight || src.naturalHeight || src.height;
     if (scratch.width !== w) scratch.width = w;
     if (scratch.height !== h) scratch.height = h;
     const ctx = scratch.getContext("2d");
@@ -186,10 +198,7 @@ export function createGLTransitions(canvas, defs) {
     if (!p) throw new Error(`Unknown gl-transition "${name}"`);
     cancelCurrent?.();
 
-    const box = canvas.parentElement.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.max(1, Math.round(box.width * dpr));
-    const h = Math.max(1, Math.round(box.height * dpr));
+    const { w, h } = pixelSize(sizeEl ?? canvas.parentElement);
     canvas.width = w;
     canvas.height = h;
     gl.viewport(0, 0, w, h);
