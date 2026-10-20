@@ -17,11 +17,11 @@ export const transitionDefs = {
   customVideo: {
     glsl: customVideo,
     uniforms: {
-      fireVideo: base + "images/fireVideo.mp4", // path relative to /public
+      fireVideo: base + "images/istock_fire.webm", // path relative to /public
       mode: 3, // 0 luma matte | 1 overlay | 2 alpha mask | 3 video is the transition
       softness: 0.1, // mode 0 edge softness
       intensity: 1.0, // mode 1 strength
-      envelope: 1.0, // mode 1: 1 = fade video in/out with progress, 0 = raw video
+      envelope: 0.15, // mode 1: 1 = fade video in/out with progress, 0 = raw video
     },
   },
 };
