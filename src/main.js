@@ -44,8 +44,8 @@ import { specialEvents } from "./special-events-data.js";
    next / prev = the arrows (whole section -> next/previous event) */
 const TRANSITIONS = {
   reveal: { name: "customVideo", duration: 1500, reverse: false },
-  next: { name: "customVideo", duration: 1400, reverse: false }, // placeholder: swap in the new transition
-  prev: { name: "burn0", duration: 1400, reverse: true },
+  next: { name: "cube", duration: 1400, reverse: false }, // placeholder: swap in the new transition
+  prev: { name: "cube", duration: 1400, reverse: true },
 };
 
 const sectionEl = document.getElementById("special-events");
