@@ -46,8 +46,9 @@ vec4 transition(vec2 uv) {
     // 3: the video itself is the transition. It covers the frame mid-way,
     // where A swaps to B, then clears.
     vec3 base = progress < 0.5 ? a.rgb : b.rgb;
-    float cover = smoothstep(0.0, 0.25, progress) * (1.0 - smoothstep(0.75, 1.0, progress));
-    col = mix(base, v.rgb, cover * v.a);
+    float cover = smoothstep(0.0, envelope, progress) * (1.0 - smoothstep(1.0 - envelope, 1.0, progress));
+    // col = mix(base, v.rgb, cover * v.a);
+    col = mix(base, v.rgb, v.a);
   }
 
   return vec4(col, 1.0);
