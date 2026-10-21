@@ -1,0 +1,77 @@
+/* The room fills whatever box you give it. Override the height from your own CSS. */
+.room {
+  position: relative;
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+  background: #000;
+  isolation: isolate;      /* contains the multiply blend of the light layer */
+  touch-action: pan-y;     /* horizontal swipes reach us, vertical scroll stays native */
+}
+
+.room__css,
+.room__gl {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.room__css { z-index: 0; }
+
+/* Light layer: black where unlit, tinted where lit, multiplied over the HTML walls. */
+.room__gl {
+  z-index: 1;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+/* Each wall container is sized by the Room to the room's width x height (--room-w / --room-h).
+   container-type lets your wall CSS use @container (width/height) and cqw/cqh units. */
+.room [data-room-wall] {
+  box-sizing: border-box;
+  overflow: hidden;
+  container-type: size;
+  container-name: room-wall;
+}
+
+.room:not(.is-ready) [data-room-wall] { visibility: hidden; }
+
+/* Built-in navigation (sits above the light layer, so it stays visible in the dark). */
+.room__ui {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.room__nav {
+  pointer-events: auto;
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.room__nav--prev { left: clamp(12px, 3vw, 32px); }
+.room__nav--next { right: clamp(12px, 3vw, 32px); }
+
+.room__nav:hover { background: rgba(255, 255, 255, 0.16); }
+.room__nav:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.room__nav:disabled { opacity: 0.3; cursor: default; }
+
+@media (max-width: 600px) {
+  .room__nav { width: 40px; height: 40px; }
+}

@@ -271,3 +271,26 @@ export const river = createRiver(document.getElementById("river"), {
   progress: Number.isNaN(debug) ? undefined : debug,
   onLayout: (api) => markers.layout(api), // re-place markers after every resize
 });
+
+/* ----------- Room ---------------------------------------------------- */
+import { Room, FlickerLight, RoomLight } from "./room/index.js";
+
+const room = new Room(document.querySelector("#room"), {
+  lights: [
+    new FlickerLight({
+      position: [0, -0.6, 0], // x, y, z in -1..1 room units
+      color: "#ff5a14",
+      colorHigh: "#ffc36b",
+      intensity: 1.9,
+      radius: 1.3,
+      flicker: 0.2,
+      speed: 2,
+    }),
+    // new RoomLight({
+    //   position: [0, 0, 0],
+    //   color: "#ffffff",
+    //   intensity: 3,
+    //   radius: 1,
+    // }),
+  ],
+});
