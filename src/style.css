@@ -261,7 +261,7 @@ button {
   inset: 0;
   background: #000;
   opacity: 0.35;
-  backdrop-filter: blur(50px);
+  /* backdrop-filter: blur(50px); */
 }
 .special__content {
   position: relative;

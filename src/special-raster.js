@@ -141,7 +141,7 @@ function drawText(ctx, el, local) {
 
 /* ---------- blurred background (cached: it never changes between events) ---------- */
 const bgCache = new WeakMap();
-const BG_K = 0.25; // the backdrop is blurred, so it is drawn at quarter resolution
+const BG_K = 1.0; // the backdrop is blurred, so it is drawn at quarter resolution
 
 function backdrop(section, lw, lh) {
   const bg = section.querySelector(".special__bg");
