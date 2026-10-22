@@ -1,0 +1,68 @@
+/* No position/height here: the shared .panel rules in style.css keep handling the stacking. */
+.kites {
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 110%, #2c3a8c 0%, #171932 65%);
+}
+
+.kites__tails {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.kites__list {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kite {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin: 0;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.kite__body {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 8px 14px rgb(0 0 0 / 0.35));
+}
+
+/* text is printed on the sail, so it tilts with the kite */
+.kite__text {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 27%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  line-height: 1;
+  color: #171932;
+  pointer-events: none;
+}
+
+.kite__value {
+  font-family: "Alumni Sans SC", "Arial Narrow", sans-serif;
+  font-weight: 700;
+  font-size: calc(var(--s) * 0.26);
+  white-space: nowrap;
+}
+
+.kite__label {
+  margin-top: calc(var(--s) * 0.02);
+  font-family: "Iosevka Charon Mono", ui-monospace, monospace;
+  font-size: calc(var(--s) * 0.085);
+  white-space: nowrap;
+}

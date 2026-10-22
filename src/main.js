@@ -345,3 +345,6 @@ new DragControls(room, {
   yawLimit: null, // for 'room', limits are the room's rotation in degrees
   release: "snap", // 'free' | 'spring' | 'snap'
 });
+
+import { createKites } from "./kites.js";
+export const kites = createKites(document.getElementById("stats"));
