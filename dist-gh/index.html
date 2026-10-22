@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#171932" />
+    <meta
+      name="description"
+      content="Inquivesta: join others throughout the night at Pronite."
+    />
+    <title>Inquivesta</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- One <link> per family so an unavailable family can't break the others -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Amita:wght@700&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Alumni+Sans+SC:wght@700&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Iosevka+Charon+Mono:wght@400&display=swap"
+    />
+    <script type="module" crossorigin src="/inquivesta-vite/assets/index-Dh3spZ80.js"></script>
+    <link rel="stylesheet" crossorigin href="/inquivesta-vite/assets/index-Ca06EoB_.css">
+  </head>
+  <body>
+    <header class="header">
+      <a href="#home" class="header__logo" aria-label="Inquivesta home">
+        <img src="/inquivesta-vite/images/logo.svg" alt="" width="43" height="43" />
+      </a>
+
+      <button
+        type="button"
+        class="menu-btn"
+        id="menu-btn"
+        aria-label="Open menu"
+        aria-expanded="false"
+        aria-controls="site-menu"
+      >
+        <svg
+          class="menu-btn__bars"
+          width="34"
+          height="26"
+          viewBox="0 0 34 26"
+          fill="none"
+          aria-hidden="true"
+        >
+          <g stroke="#fff" stroke-width="3.5">
+            <path d="M0 3h34" />
+            <path d="M0 13h34" />
+            <path d="M0 23h34" />
+          </g>
+        </svg>
+        <svg
+          class="menu-btn__x"
+          width="34"
+          height="26"
+          viewBox="0 0 34 26"
+          fill="none"
+          aria-hidden="true"
+        >
+          <g stroke="#fff" stroke-width="3.5">
+            <path d="M5 1.5l24 23" />
+            <path d="M29 1.5L5 24.5" />
+          </g>
+        </svg>
+      </button>
+
+      <div class="menu" id="site-menu" data-open="false" inert>
+        <div class="mandala">
+          <!-- Replace this file (PNG, or an SVG with links later) to change the menu art -->
+          <img class="mandala__art" src="/inquivesta-vite/images/menu-mandala.png" alt="" />
+          <button
+            type="button"
+            class="mandala__close"
+            id="menu-close"
+            aria-label="Close menu"
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M5 5l14 14M19 5L5 19"
+                stroke="currentColor"
+                stroke-width="2.4"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="home" class="hero panel">
+        <h1 class="hero__title">INQUIVESTA</h1>
+      </section>
+
+      <section
+        id="special-events"
+        class="special panel"
+        aria-label="Special events"
+      >
+        <div class="special__bg" aria-hidden="true">
+          <img
+            class="special__dancer1"
+            src="/inquivesta-vite/images/fire-dancer-1.png"
+            alt=""
+            loading="lazy"
+          />
+          <img
+            class="special__dancer2"
+            src="/inquivesta-vite/images/fire-dancer-2.png"
+            alt=""
+            loading="lazy"
+          />
+        </div>
+        <div class="special__shade"></div>
+        <div class="special__content">
+          <div class="special__text">
+            <h2
+              class="special__title"
+              id="special-title"
+              aria-live="polite"
+            ></h2>
+            <p class="special__desc" id="special-desc"></p>
+            <p class="special__name" id="special-name" aria-live="polite"></p>
+            <div class="special__arrows">
+              <button
+                type="button"
+                class="special__arrow"
+                id="special-prev"
+                aria-label="Previous event"
+              >
+                <img src="/inquivesta-vite/images/arrow-2.svg" alt="" class="flip" />
+              </button>
+              <button
+                type="button"
+                class="special__arrow"
+                id="special-next"
+                aria-label="Next event"
+              >
+                <img src="/inquivesta-vite/images/arrow-1.svg" alt="" />
+              </button>
+            </div>
+          </div>
+          <!-- Click to crossfade between the event image and the artist photo -->
+          <button
+            type="button"
+            class="special__card"
+            id="special-card"
+            data-revealed="false"
+            aria-pressed="false"
+          >
+            <img
+              class="special__face special__face--event"
+              id="special-event-img"
+              alt=""
+            />
+            <img
+              class="special__face special__face--artist"
+              id="special-artist-img"
+              alt=""
+            />
+            <span
+              class="special__caption"
+              id="special-caption"
+              aria-hidden="true"
+            ></span>
+          </button>
+        </div>
+      </section>
+
+      <section id="stats" class="stats panel">
+        <img class="stats__bg" src="/inquivesta-vite/images/castle.png" alt="" loading="lazy" />
+        <div class="stats__shade"></div>
+        <!-- The design has no labels under the figures; replace with real values -->
+        <ul class="stats__list">
+          <li class="stats__item">100+</li>
+          <li class="stats__item">100+</li>
+          <li class="stats__item">100+</li>
+          <li class="stats__item">100+</li>
+        </ul>
+      </section>
+      <section id="timeline" class="timeline panel" aria-label="Timeline">
+        <div class="river" id="river">
+          <canvas class="river__canvas" aria-hidden="true"></canvas>
+          <ol class="river__events" id="river-events"></ol>
+          <div class="river__boat" aria-hidden="true">
+            <img class="river__boat-img" src="/inquivesta-vite/images/boat.svg" alt="" />
+          </div>
+        </div>
+      </section>
+      <section id="room" class="panel">
+        <div style="background: blue" data-room-wall>
+          <h2>i am 1</h2>
+        </div>
+        <div style="background: green" data-room-wall>
+          <h2>i am 2</h2>
+        </div>
+        <div style="background: red" data-room-wall>
+          <h2>i am 3</h2>
+        </div>
+        <div style="background: blue" data-room-wall>
+          <h2>i am 4</h2>
+        </div>
+        <div style="background: green" data-room-wall>
+          <h2>i am 5</h2>
+        </div>
+        <div style="background: red" data-room-wall>
+          <h2>i am 6</h2>
+        </div>
+      </section>
+      <!-- Snap targets must NOT be sticky (a pinned element is always "at the start"), so they live separately -->
+      <div class="snap-points" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </main>
+
+  </body>
+</html>
