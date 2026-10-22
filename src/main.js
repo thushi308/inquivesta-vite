@@ -305,30 +305,43 @@ export const river = createRiver(document.getElementById("river"), {
 // fire.moveTo([0, 0, 0], { duration: 0 }); // instant
 // fire.position.set(0.1, 0.2, 0); // also works directly
 
-import { PolyRoom, DragControls, FlickerLight } from "./polyroom/index.js";
+import {
+  PolyRoom,
+  DragControls,
+  FlickerLight,
+  RoomLight,
+} from "./polyroom/index.js";
 
 const room = new PolyRoom(document.querySelector("#room"), {
   // prevButton: ".my-prev", // selector, element, or list of elements
   // nextButton: document.querySelector(".my-next"),
-  floor: { color: "#141414", texture: "/images/floor.jpg", tile: 512 },
-  ceiling: { color: "#0c0c0c" }, // or false for pure black
-  lights: [
-    new FlickerLight({
-      position: [0, -0.6, 0],
-      color: "#ff5a14",
-      intensity: 16,
-      radius: 1.3,
-    }),
-  ],
+  floor: { color: "#ffffff", texture: "/images/floor.png", tile: 512 },
+  ceiling: { color: "#ffffff", texture: "/images/floor.png", tile: 512 }, // or false for pure black
+  // lights: [
+  //   new RoomLight({
+  //     position: [0, -0.6, 0],
+  //     color: "#ff5a14",
+  //     intensity: 16,
+  //     radius: 1.3,
+  //   }),
+  // ],
+  ambient: 1,
 });
 
 room.setCamera(
-  { x: 0, y: 0, z: 0 },
+  { x: 0, y: 0, z: 0.4 },
   { duration: 1.2 }, // 0 = instant
 );
 
+// new DragControls(room, {
+//   axis: "horizontal", // 'horizontal' | 'vertical' | 'both'
+//   // yawLimit: [-40, 40],
+//   release: "free", // 'free' | 'spring' | 'snap'
+// });
+
 new DragControls(room, {
-  axis: "both", // 'horizontal' | 'vertical' | 'both'
-  // yawLimit: [-40, 40],
-  release: "free", // 'free' | 'spring' | 'snap'
+  target: "room", // spin the room instead of moving the camera
+  axis: "horizontal",
+  yawLimit: null, // for 'room', limits are the room's rotation in degrees
+  release: "snap", // 'free' | 'spring' | 'snap'
 });

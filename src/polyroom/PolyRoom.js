@@ -1,6 +1,9 @@
-import * as THREE from 'three';
-import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
-import { easeInOutCubic } from '../room/ease.js';
+import * as THREE from "three";
+import {
+  CSS3DRenderer,
+  CSS3DObject,
+} from "three/addons/renderers/CSS3DRenderer.js";
+import { easeInOutCubic } from "../room/ease.js";
 
 /*
  * PolyRoom
@@ -24,8 +27,9 @@ const TAU = Math.PI * 2;
 const mod = (n, m) => ((n % m) + m) % m;
 const rad = THREE.MathUtils.degToRad;
 const deg = THREE.MathUtils.radToDeg;
-const CAM_KEYS = ['x', 'y', 'z', 'pitch', 'yaw', 'roll', 'zoom'];
+const CAM_KEYS = ["x", "y", "z", "pitch", "yaw", "roll", "zoom"];
 const CAM_HOME = { x: 0, y: 0, z: 0, pitch: 0, yaw: 0, roll: 0, zoom: 1 };
+const ROT_KEYS = ["yaw", "pitch", "roll"];
 const _rgb = { r: 0, g: 0, b: 0 };
 
 // ---------------------------------------------------------------- shaders
@@ -78,9 +82,11 @@ const wallFrag = (max) => /* glsl */ `
 
 const SHELL_VERT = /* glsl */ `
   varying vec3 vWorldPos;
+  varying vec2 vUv;
   void main() {
     vec4 wp = modelMatrix * vec4(position, 1.0);
     vWorldPos = wp.xyz;
+    vUv = position.xz; // room-space, so the texture turns with the room
     gl_Position = projectionMatrix * viewMatrix * wp;
   }
 `;
@@ -93,9 +99,10 @@ const shellFrag = (max) => /* glsl */ `
   uniform float uTile;
   uniform vec3 uNormal;
   varying vec3 vWorldPos;
+  varying vec2 vUv;
   void main() {
     vec3 albedo = uColor;
-    if (uHasMap > 0.5) albedo *= texture2D(uMap, vWorldPos.xz / uTile).rgb;
+    if (uHasMap > 0.5) albedo *= texture2D(uMap, vUv / uTile).rgb;
     vec3 lit = min(computeLight(vWorldPos, uNormal), vec3(1.0));
     vec3 c = albedo * lit + (hash21(gl_FragCoord.xy) - 0.5) / 255.0;
     gl_FragColor = vec4(c, 1.0);
@@ -104,7 +111,7 @@ const shellFrag = (max) => /* glsl */ `
 
 const toElements = (spec) => {
   if (!spec) return [];
-  if (typeof spec === 'string') return [...document.querySelectorAll(spec)];
+  if (typeof spec === "string") return [...document.querySelectorAll(spec)];
   if (spec instanceof Element) return [spec];
   return Array.from(spec);
 };
@@ -122,6 +129,7 @@ export class PolyRoom extends EventTarget {
    * @param {number} [opts.maxFov=100]      widest vertical FOV allowed (degrees)
    * @param {number} [opts.startIndex=0]
    * @param {object} [opts.camera]          initial view { x, y, z, pitch, yaw, roll, zoom }
+   * @param {object} [opts.rotation]        initial room rotation { yaw, pitch, roll } in degrees
    * @param {string[]} [opts.resetOnNavigate=['yaw','pitch']]  camera keys eased back to home on next/prev
    * @param {Element|Element[]|string} [opts.prevButton]  any element(s) / selector
    * @param {Element|Element[]|string} [opts.nextButton]
@@ -131,7 +139,7 @@ export class PolyRoom extends EventTarget {
   constructor(root, opts = {}) {
     super();
     const o = {
-      walls: '[data-room-wall]',
+      walls: "[data-room-wall]",
       lights: [],
       maxLights: 4,
       ambient: 0,
@@ -140,7 +148,8 @@ export class PolyRoom extends EventTarget {
       maxFov: 100,
       startIndex: 0,
       camera: {},
-      resetOnNavigate: ['yaw', 'pitch'],
+      rotation: {},
+      resetOnNavigate: ["yaw", "pitch"],
       prevButton: null,
       nextButton: null,
       floor: {},
@@ -150,41 +159,70 @@ export class PolyRoom extends EventTarget {
     this.opts = o;
     this.root = root;
     this.walls =
-      typeof o.walls === 'string' ? [...root.querySelectorAll(o.walls)] : Array.from(o.walls);
+      typeof o.walls === "string"
+        ? [...root.querySelectorAll(o.walls)]
+        : Array.from(o.walls);
     this.count = this.walls.length;
     if (this.count < 3) {
-      throw new Error(`PolyRoom needs at least 3 walls to form a room (got ${this.count}).`);
+      throw new Error(
+        `PolyRoom needs at least 3 walls to form a room (got ${this.count}).`,
+      );
     }
 
     this.theta = TAU / this.count; // angle between neighbouring walls
     this.step = o.startIndex;
-    this.yaw = -this.step * this.theta;
+    this.rot = { yaw: 0, pitch: 0, roll: 0, ...o.rotation }; // the room's own rotation (degrees)
+    this._rotTween = null;
+    this.yaw = -this.step * this.theta + rad(this.rot.yaw);
     this.view = { ...CAM_HOME, ...o.camera };
     this.maxLights = o.maxLights;
     this.lights = [];
-    this.W = 1; this.H = 1; this.Wp = 1; this.a = 1; this.rho = 1;
+    this.W = 1;
+    this.H = 1;
+    this.Wp = 1;
+    this.a = 1;
+    this.rho = 1;
     this._anim = null;
     this._camTween = null;
     this._locks = 0;
     this._raf = 0;
     this._last = performance.now() / 1000;
-    this._reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    this._reduced = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
     this._unbind = [];
     this._raycaster = new THREE.Raycaster();
 
-    root.classList.add('polyroom');
+    root.classList.add("polyroom");
 
     this.camera = new THREE.PerspectiveCamera(60, 1, 1, 10000);
-    this.camera.rotation.order = 'YXZ';
+    this.camera.rotation.order = "YXZ";
     this.cssScene = new THREE.Scene();
     this.glScene = new THREE.Scene();
     this.shellScene = new THREE.Scene();
+    // Everything that belongs to the room lives in a group per layer; rotating the groups
+    // spins the room while the camera and the lights (world space) stay where they are.
+    this.cssRoom = new THREE.Group();
+    this.glRoom = new THREE.Group();
+    this.shellRoom = new THREE.Group();
+    [this.cssRoom, this.glRoom, this.shellRoom].forEach((g) => {
+      g.rotation.order = "YXZ";
+    });
+    this.cssScene.add(this.cssRoom);
+    this.glScene.add(this.glRoom);
+    this.shellScene.add(this.shellRoom);
 
     const M = this.maxLights;
     this.lightUniforms = {
-      uLightPos: { value: Array.from({ length: M }, () => new THREE.Vector3()) },
-      uLightColor: { value: Array.from({ length: M }, () => new THREE.Vector3()) },
-      uLightParams: { value: Array.from({ length: M }, () => new THREE.Vector2(0, 2)) },
+      uLightPos: {
+        value: Array.from({ length: M }, () => new THREE.Vector3()),
+      },
+      uLightColor: {
+        value: Array.from({ length: M }, () => new THREE.Vector3()),
+      },
+      uLightParams: {
+        value: Array.from({ length: M }, () => new THREE.Vector2(0, 2)),
+      },
       uAmbient: { value: new THREE.Vector3(o.ambient, o.ambient, o.ambient) },
       uWrap: { value: o.wrap },
     };
@@ -193,32 +231,44 @@ export class PolyRoom extends EventTarget {
     this.shell = null;
     this.surfaces = [];
     if (o.floor || o.ceiling) {
-      this.shell = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+      this.shell = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: false,
+        powerPreference: "high-performance",
+      });
       this.shell.setClearColor(0x000000, 1);
-      this.shell.domElement.classList.add('polyroom__shell');
+      this.shell.domElement.classList.add("polyroom__shell");
       root.appendChild(this.shell.domElement);
-      this._white = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+      this._white = new THREE.DataTexture(
+        new Uint8Array([255, 255, 255, 255]),
+        1,
+        1,
+      );
       this._white.needsUpdate = true;
       this._shellGeo = new THREE.BufferGeometry();
-      if (o.floor) this._addSurface(o.floor, +1, -1);   // normal up, sits at the bottom
+      if (o.floor) this._addSurface(o.floor, +1, -1); // normal up, sits at the bottom
       if (o.ceiling) this._addSurface(o.ceiling, -1, +1); // normal down, sits at the top
     }
 
     // --- layer 1: HTML walls ---
     this.css = new CSS3DRenderer();
-    this.css.domElement.classList.add('polyroom__css');
+    this.css.domElement.classList.add("polyroom__css");
     root.appendChild(this.css.domElement);
     this.objs = this.walls.map((el) => {
       const obj = new CSS3DObject(el);
-      el.style.userSelect = '';
-      this.cssScene.add(obj);
+      el.style.userSelect = "";
+      this.cssRoom.add(obj);
       return obj;
     });
 
     // --- layer 2: wall light-map (multiplied over the HTML) ---
-    this.gl = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+    this.gl = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: "high-performance",
+    });
     this.gl.setClearColor(0xffffff, 1); // white = "no change" where there is no wall
-    this.gl.domElement.classList.add('polyroom__gl');
+    this.gl.domElement.classList.add("polyroom__gl");
     root.appendChild(this.gl.domElement);
     this._wallGeo = new THREE.PlaneGeometry(1, 1);
     this._wallMat = new THREE.ShaderMaterial({
@@ -228,7 +278,7 @@ export class PolyRoom extends EventTarget {
     });
     this.glWalls = this.walls.map(() => {
       const m = new THREE.Mesh(this._wallGeo, this._wallMat);
-      this.glScene.add(m);
+      this.glRoom.add(m);
       return m;
     });
 
@@ -242,21 +292,33 @@ export class PolyRoom extends EventTarget {
 
     this._ro = new ResizeObserver(() => this._resize());
     this._ro.observe(root);
-    this._io = new IntersectionObserver(([e]) => (e.isIntersecting ? this.start() : this.stop()));
+    this._io = new IntersectionObserver(([e]) =>
+      e.isIntersecting ? this.start() : this.stop(),
+    );
     this._io.observe(root);
 
     this._renderFrame(this._last);
-    root.classList.add('is-ready');
+    root.classList.add("is-ready");
   }
 
   // ================================================================ public API
-  get index() { return mod(this.step, this.count); }
-  get isMoving() { return !!this._anim; }
-  /** Absolute direction the camera is looking (radians), including yaw offset. */
-  get heading() { return this.yaw + rad(this.view.yaw); }
+  get index() {
+    return mod(this.step, this.count);
+  }
+  get isMoving() {
+    return !!this._anim || !!this._rotTween;
+  }
+  /** Direction the camera is looking in ROOM space (radians): wall k is dead ahead at -k*theta. */
+  get heading() {
+    return this.yaw + rad(this.view.yaw) - rad(this.rot.yaw);
+  }
 
-  next() { this._move(1); }
-  prev() { this._move(-1); }
+  next() {
+    this._move(1);
+  }
+  prev() {
+    this._move(-1);
+  }
 
   /** Turn to wall `index` by the shortest way round. */
   goTo(index) {
@@ -274,22 +336,107 @@ export class PolyRoom extends EventTarget {
   setCamera(values = {}, { duration = 0.8, ease = easeInOutCubic } = {}) {
     this._camTween?.resolve();
     const to = {};
-    for (const k of CAM_KEYS) if (typeof values[k] === 'number') to[k] = values[k];
+    for (const k of CAM_KEYS)
+      if (typeof values[k] === "number") to[k] = values[k];
     if (duration <= 0) {
       Object.assign(this.view, to);
       this._camTween = null;
       return Promise.resolve();
     }
     return new Promise((resolve) => {
-      this._camTween = { from: { ...this.view }, to, t0: null, duration, ease, resolve };
+      this._camTween = {
+        from: { ...this.view },
+        to,
+        t0: null,
+        duration,
+        ease,
+        resolve,
+      };
     });
   }
 
-  getCamera() { return { ...this.view }; }
-  resetCamera(opts) { return this.setCamera(CAM_HOME, opts); }
+  getCamera() {
+    return { ...this.view };
+  }
+  resetCamera(opts) {
+    return this.setCamera(CAM_HOME, opts);
+  }
+
+  /**
+   * Rotate the ROOM itself (walls, floor, ceiling) around its centre. The camera and the
+   * lights do not move. Any subset of { yaw, pitch, roll } in degrees; duration 0 = instant.
+   *   yaw   : positive slides what is on your right towards the left
+   *   pitch : positive lifts the wall in front of you
+   * When it finishes, the wall nearest to the camera becomes the current (interactive) wall.
+   * Pass { sync: false } to skip that (used while dragging). Returns a Promise.
+   */
+  setRoomRotation(
+    values = {},
+    { duration = 0.8, ease = easeInOutCubic, sync = true } = {},
+  ) {
+    const hadTween = !!this._rotTween;
+    this._rotTween?.resolve();
+    const to = {};
+    for (const k of ROT_KEYS)
+      if (typeof values[k] === "number") to[k] = values[k];
+    if (duration <= 0) {
+      Object.assign(this.rot, to);
+      this._rotTween = null;
+      if (sync) this._syncStep();
+      if (hadTween) this._refreshInteractive();
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      this._rotTween = {
+        from: { ...this.rot },
+        to,
+        t0: null,
+        duration,
+        ease,
+        resolve,
+        sync,
+      };
+      this._refreshInteractive();
+    });
+  }
+
+  getRoomRotation() {
+    return { ...this.rot };
+  }
+  resetRoomRotation(opts) {
+    return this.setRoomRotation({ yaw: 0, pitch: 0, roll: 0 }, opts);
+  }
+
+  /**
+   * Spin the room (not the camera) so that wall `step` ends up dead ahead, and make it the
+   * current wall. Pitch eases back to 0 unless resetPitch is false.
+   */
+  snapRoomTo(
+    step,
+    { duration = 0.7, ease = easeInOutCubic, resetPitch = true } = {},
+  ) {
+    if (this._anim) return Promise.resolve();
+    this._camTween?.resolve();
+    this._camTween = null;
+    const camYaw = this.yaw + rad(this.view.yaw);
+    const before = this.index;
+    this.step = step;
+    this.yaw = camYaw; // camera keeps pointing exactly where it points
+    this.view.yaw = 0;
+    const to = { yaw: deg(camYaw + step * this.theta) };
+    if (resetPitch) to.pitch = 0;
+    if (this.index !== before) {
+      this.dispatchEvent(
+        new CustomEvent("change", { detail: { step, index: this.index } }),
+      );
+    }
+    return this.setRoomRotation(to, { duration, ease, sync: false });
+  }
 
   /** Step index of the wall closest to where the camera is looking. */
-  nearestStep() { return Math.round(-this.heading / this.theta); }
+  nearestStep() {
+    return Math.round(-this.heading / this.theta);
+  }
 
   /**
    * Make `step` the current wall WITHOUT moving the camera (the yaw offset absorbs the
@@ -299,14 +446,16 @@ export class PolyRoom extends EventTarget {
     if (this._anim) return;
     this._camTween?.resolve();
     this._camTween = null;
-    const heading = this.heading;
+    const world = this.yaw + rad(this.view.yaw); // where the camera really points
     const before = this.index;
     this.step = step;
-    this.yaw = -step * this.theta;
-    this.view.yaw = deg(heading - this.yaw);
+    this.yaw = -step * this.theta + rad(this.rot.yaw);
+    this.view.yaw = deg(world - this.yaw);
     this._refreshInteractive();
     if (this.index !== before) {
-      this.dispatchEvent(new CustomEvent('change', { detail: { step, index: this.index } }));
+      this.dispatchEvent(
+        new CustomEvent("change", { detail: { step, index: this.index } }),
+      );
     }
   }
 
@@ -319,14 +468,18 @@ export class PolyRoom extends EventTarget {
   // ---- lights
   addLight(light) {
     if (this.lights.length >= this.maxLights) {
-      console.warn(`PolyRoom: max ${this.maxLights} lights (raise the maxLights option)`);
+      console.warn(
+        `PolyRoom: max ${this.maxLights} lights (raise the maxLights option)`,
+      );
       return light;
     }
     this.lights.push(light);
     return light;
   }
 
-  removeLight(light) { this.lights = this.lights.filter((l) => l !== light); }
+  removeLight(light) {
+    this.lights = this.lights.filter((l) => l !== light);
+  }
 
   /** Light (or null) whose position is within `radius` px of the pointer on screen. */
   pickLight(clientX, clientY, radius = 48) {
@@ -341,7 +494,10 @@ export class PolyRoom extends EventTarget {
       const sx = rect.left + ((v.x + 1) / 2) * rect.width;
       const sy = rect.top + ((1 - v.y) / 2) * rect.height;
       const d = Math.hypot(sx - clientX, sy - clientY);
-      if (d < bestD) { bestD = d; best = light; }
+      if (d < bestD) {
+        bestD = d;
+        best = light;
+      }
     }
     return best;
   }
@@ -350,7 +506,12 @@ export class PolyRoom extends EventTarget {
    * Move a light to the pointer, keeping its distance from the camera
    * (it slides on a plane facing the camera). duration 0 = follows instantly.
    */
-  moveLightToPointer(light, clientX, clientY, { duration = 0, clamp = true } = {}) {
+  moveLightToPointer(
+    light,
+    clientX,
+    clientY,
+    { duration = 0, clamp = true } = {},
+  ) {
     const rect = this.root.getBoundingClientRect();
     const ndc = new THREE.Vector2(
       ((clientX - rect.left) / rect.width) * 2 - 1,
@@ -359,15 +520,22 @@ export class PolyRoom extends EventTarget {
     this.camera.updateMatrixWorld();
     this._raycaster.setFromCamera(ndc, this.camera);
     const dir = this.camera.getWorldDirection(new THREE.Vector3());
-    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(dir, this._lightWorld(light.position));
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(
+      dir,
+      this._lightWorld(light.position),
+    );
     const hit = new THREE.Vector3();
-    if (!this._raycaster.ray.intersectPlane(plane, hit)) return Promise.resolve();
+    if (!this._raycaster.ray.intersectPlane(plane, hit))
+      return Promise.resolve();
     let nx = hit.x / this.a;
     let ny = hit.y / (this.H / 2);
     let nz = hit.z / this.a;
     if (clamp) {
       const r = Math.hypot(nx, nz);
-      if (r > 0.97) { nx *= 0.97 / r; nz *= 0.97 / r; }
+      if (r > 0.97) {
+        nx *= 0.97 / r;
+        nz *= 0.97 / r;
+      }
       ny = Math.max(-0.97, Math.min(0.97, ny));
     }
     return light.moveTo([nx, ny, nz], { duration });
@@ -392,9 +560,16 @@ export class PolyRoom extends EventTarget {
     this._unbind.forEach((fn) => fn());
     this.walls.forEach((el) => {
       el.inert = false;
-      el.removeAttribute('data-room-active');
-      ['position', 'width', 'height', 'transform', 'display', 'pointerEvents', 'userSelect']
-        .forEach((p) => (el.style[p] = ''));
+      el.removeAttribute("data-room-active");
+      [
+        "position",
+        "width",
+        "height",
+        "transform",
+        "display",
+        "pointerEvents",
+        "userSelect",
+      ].forEach((p) => (el.style[p] = ""));
       this.root.appendChild(el);
     });
     this.css.domElement.remove();
@@ -408,22 +583,30 @@ export class PolyRoom extends EventTarget {
       this.surfaces.forEach((s) => s.material.dispose());
       this.shell.dispose();
     }
-    this.root.classList.remove('polyroom', 'is-ready');
+    this.root.classList.remove("polyroom", "is-ready");
   }
 
   // ================================================================ internals
   _bindButtons(spec, fn) {
     toElements(spec).forEach((el) => {
-      el.addEventListener('click', fn);
-      this._unbind.push(() => el.removeEventListener('click', fn));
+      el.addEventListener("click", fn);
+      this._unbind.push(() => el.removeEventListener("click", fn));
     });
   }
 
   _addSurface(spec, normalY, side) {
-    const s = { color: '#141414', texture: null, tile: 512, ...(spec === true ? {} : spec) };
+    const s = {
+      color: "#141414",
+      texture: null,
+      tile: 512,
+      ...(spec === true ? {} : spec),
+    };
     let map = this._white;
     if (s.texture) {
-      map = typeof s.texture === 'string' ? new THREE.TextureLoader().load(s.texture) : s.texture;
+      map =
+        typeof s.texture === "string"
+          ? new THREE.TextureLoader().load(s.texture)
+          : s.texture;
       map.wrapS = map.wrapT = THREE.RepeatWrapping;
       map.colorSpace = THREE.NoColorSpace; // keep raw sRGB values, same math as the walls
     }
@@ -444,7 +627,7 @@ export class PolyRoom extends EventTarget {
     const mesh = new THREE.Mesh(this._shellGeo, material);
     mesh.frustumCulled = false;
     mesh.userData.side = side;
-    this.shellScene.add(mesh);
+    this.shellRoom.add(mesh);
     this.surfaces.push(mesh);
     mesh.material = material;
   }
@@ -459,41 +642,64 @@ export class PolyRoom extends EventTarget {
   }
 
   _refreshInteractive() {
-    const ok = !this._anim && this._locks === 0;
+    const ok = !this._anim && !this._rotTween && this._locks === 0;
     this.walls.forEach((el, i) => {
       const active = i === this.index;
       el.inert = !(ok && active);
-      el.toggleAttribute('data-room-active', active);
+      el.toggleAttribute("data-room-active", active);
     });
   }
 
   _move(d) {
-    if (this._anim || this._locks || !d) return;
+    if (this._anim || this._rotTween || this._locks || !d) return;
     const from = this.step;
     const to = from + d;
     this._refreshInteractiveMoving();
-    const dur = this._reduced ? 0.01 : this.opts.duration * (1 + 0.35 * (Math.abs(d) - 1));
-    this._anim = { from: this.yaw, to: -to * this.theta, target: to, t0: null, dur };
+    const dur = this._reduced
+      ? 0.01
+      : this.opts.duration * (1 + 0.35 * (Math.abs(d) - 1));
+    this._anim = {
+      from: this.yaw,
+      to: -to * this.theta + rad(this.rot.yaw),
+      target: to,
+      t0: null,
+      dur,
+    };
 
     const reset = {};
-    for (const k of this.opts.resetOnNavigate) if (k in CAM_HOME) reset[k] = CAM_HOME[k];
+    for (const k of this.opts.resetOnNavigate)
+      if (k in CAM_HOME) reset[k] = CAM_HOME[k];
     if (Object.keys(reset).length) this.setCamera(reset, { duration: dur });
 
-    this.dispatchEvent(new CustomEvent('movestart', { detail: { from, to, index: mod(to, this.count) } }));
+    this.dispatchEvent(
+      new CustomEvent("movestart", {
+        detail: { from, to, index: mod(to, this.count) },
+      }),
+    );
   }
 
   _refreshInteractiveMoving() {
-    this.walls.forEach((el) => { el.inert = true; });
+    this.walls.forEach((el) => {
+      el.inert = true;
+    });
   }
 
   _finishMove() {
     const a = this._anim;
     this._anim = null;
     this.step = a.target;
-    this.yaw = -a.target * this.theta;
+    this.yaw = a.to;
     this._refreshInteractive();
-    this.dispatchEvent(new CustomEvent('moveend', { detail: { step: this.step, index: this.index } }));
-    this.dispatchEvent(new CustomEvent('change', { detail: { step: this.step, index: this.index } }));
+    this.dispatchEvent(
+      new CustomEvent("moveend", {
+        detail: { step: this.step, index: this.index },
+      }),
+    );
+    this.dispatchEvent(
+      new CustomEvent("change", {
+        detail: { step: this.step, index: this.index },
+      }),
+    );
   }
 
   _resize() {
@@ -506,7 +712,7 @@ export class PolyRoom extends EventTarget {
     // FOV (portrait screens, few walls), the wall *planes* grow wider than W; content stays
     // W x H and centred, so at rest it still fills the screen exactly.
     const Wp = Math.max(W, (H * tanHalf) / Math.tan(rad(this.opts.maxFov) / 2));
-    const a = Wp / (2 * tanHalf);                 // apothem: centre -> wall
+    const a = Wp / (2 * tanHalf); // apothem: centre -> wall
     const rho = Wp / (2 * Math.sin(Math.PI / N)); // circumradius: centre -> corner
     Object.assign(this, { W, H, Wp, a, rho });
 
@@ -526,8 +732,8 @@ export class PolyRoom extends EventTarget {
       this._buildShellGeometry();
     }
 
-    this.root.style.setProperty('--room-w', `${W}px`);
-    this.root.style.setProperty('--room-h', `${H}px`);
+    this.root.style.setProperty("--room-w", `${W}px`);
+    this.root.style.setProperty("--room-h", `${H}px`);
     this.walls.forEach((el) => {
       el.style.width = `${W}px`;
       el.style.height = `${H}px`;
@@ -543,7 +749,9 @@ export class PolyRoom extends EventTarget {
       m.position.set(p.x, 0, p.z);
       m.rotation.y = p.ry;
     });
-    this.surfaces.forEach((m) => { m.position.y = m.userData.side * (H / 2); });
+    this.surfaces.forEach((m) => {
+      m.position.y = m.userData.side * (H / 2);
+    });
   }
 
   // polygon fan for floor/ceiling, corners match the wall corners
@@ -557,9 +765,29 @@ export class PolyRoom extends EventTarget {
     }
     const idx = [];
     for (let i = 0; i < N; i++) idx.push(0, i + 1, ((i + 1) % N) + 1);
-    this._shellGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this._shellGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     this._shellGeo.setIndex(idx);
     this._shellGeo.attributes.position.needsUpdate = true;
+  }
+
+  _syncStep() {
+    if (!this._anim) this.commitStep(this.nearestStep());
+  }
+
+  _stepRotation(t) {
+    const c = this._rotTween;
+    if (!c) return;
+    if (c.t0 === null) c.t0 = t;
+    const k = Math.min((t - c.t0) / c.duration, 1);
+    const e = c.ease(k);
+    for (const key in c.to)
+      this.rot[key] = c.from[key] + (c.to[key] - c.from[key]) * e;
+    if (k >= 1) {
+      this._rotTween = null;
+      c.resolve();
+      this._refreshInteractive();
+      if (c.sync) this._syncStep();
+    }
   }
 
   _stepCamera(t) {
@@ -568,7 +796,8 @@ export class PolyRoom extends EventTarget {
     if (c.t0 === null) c.t0 = t;
     const k = Math.min((t - c.t0) / c.duration, 1);
     const e = c.ease(k);
-    for (const key in c.to) this.view[key] = c.from[key] + (c.to[key] - c.from[key]) * e;
+    for (const key in c.to)
+      this.view[key] = c.from[key] + (c.to[key] - c.from[key]) * e;
     if (k >= 1) {
       this._camTween = null;
       c.resolve();
@@ -580,6 +809,9 @@ export class PolyRoom extends EventTarget {
     const cam = this.camera;
     cam.position.set(v.x * this.a, (v.y * this.H) / 2, v.z * this.a);
     cam.rotation.set(rad(v.pitch), this.yaw + rad(v.yaw), rad(v.roll));
+    const r = this.rot;
+    for (const g of [this.cssRoom, this.glRoom, this.shellRoom])
+      g.rotation.set(rad(r.pitch), rad(r.yaw), rad(r.roll));
     const zoom = Math.max(0.01, v.zoom);
     if (cam.zoom !== zoom) {
       cam.zoom = zoom;
@@ -592,12 +824,23 @@ export class PolyRoom extends EventTarget {
     const u = this.lightUniforms;
     for (let i = 0; i < this.maxLights; i++) {
       const light = this.lights[i];
-      if (!light) { u.uLightParams.value[i].set(0, 2); continue; }
+      if (!light) {
+        u.uLightParams.value[i].set(0, 2);
+        continue;
+      }
       light.update(time, dt);
       const out = light.output;
-      u.uLightPos.value[i].set(out.position.x * a, out.position.y * (H / 2), out.position.z * a);
+      u.uLightPos.value[i].set(
+        out.position.x * a,
+        out.position.y * (H / 2),
+        out.position.z * a,
+      );
       out.color.getRGB(_rgb, THREE.SRGBColorSpace);
-      u.uLightColor.value[i].set(_rgb.r * out.intensity, _rgb.g * out.intensity, _rgb.b * out.intensity);
+      u.uLightColor.value[i].set(
+        _rgb.r * out.intensity,
+        _rgb.g * out.intensity,
+        _rgb.b * out.intensity,
+      );
       u.uLightParams.value[i].set(out.radius * a * 2, out.falloff);
     }
   }
@@ -613,6 +856,7 @@ export class PolyRoom extends EventTarget {
       if (k >= 1) this._finishMove();
     }
     this._stepCamera(t);
+    this._stepRotation(t);
     this._updateLights(t, dt);
     this._applyView();
     this.shell?.render(this.shellScene, this.camera);
