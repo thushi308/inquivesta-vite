@@ -1,0 +1,46 @@
+/* The room fills whatever box you give it. Override the height from your own CSS. */
+.polyroom {
+  position: relative;
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+  background: #000;
+  isolation: isolate; /* contains the multiply blend of the light layer */
+}
+
+.polyroom__shell,
+.polyroom__css,
+.polyroom__gl {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.polyroom__shell { z-index: 0; pointer-events: none; }  /* lit floor + ceiling */
+.polyroom__css   { z-index: 1; }                        /* your HTML walls */
+.polyroom__gl {                                         /* wall light-map */
+  z-index: 2;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+/* Every wall container is sized to the room (--room-w x --room-h).
+   container-type lets your wall CSS use @container queries and cqw / cqh units. */
+.polyroom [data-room-wall] {
+  box-sizing: border-box;
+  overflow: hidden;
+  container-type: size;
+  container-name: room-wall;
+}
+
+.polyroom:not(.is-ready) [data-room-wall] { visibility: hidden; }
+
+/* set by DragControls */
+.polyroom.is-draggable { cursor: grab; }
+.polyroom.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}

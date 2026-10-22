@@ -273,34 +273,62 @@ export const river = createRiver(document.getElementById("river"), {
 });
 
 /* ----------- Room ---------------------------------------------------- */
-import { Room, FlickerLight, RoomLight } from "./room/index.js";
+// import { Room, FlickerLight, RoomLight } from "./room/index.js";
+//
+// let room_light = new RoomLight({
+//   position: [0, 0, 0],
+//   color: "#ffffff",
+//   intensity: 3,
+//   radius: 1,
+// });
+// let fire = new FlickerLight({
+//   position: [0, -0.6, 0], // x, y, z in -1..1 room units
+//   color: "#ff5a14",
+//   colorHigh: "#ffc36b",
+//   intensity: 1.9,
+//   radius: 1.3,
+//   flicker: 0.2,
+//   speed: 2,
+// });
 
-let room_light = new RoomLight({
-  position: [0, 0, 0],
-  color: "#ffffff",
-  intensity: 3,
-  radius: 1,
-});
-let fire = new FlickerLight({
-  position: [0, -0.6, 0], // x, y, z in -1..1 room units
-  color: "#ff5a14",
-  colorHigh: "#ffc36b",
-  intensity: 1.9,
-  radius: 1.3,
-  flicker: 0.2,
-  speed: 2,
-});
+// const room = new Room(document.querySelector("#room"), {
+//   lights: [fire, room_light],
+//   ambient: 0.3,
+// });
+//
+// room.setCamera(
+//   { x: 0.2, y: 0, z: 0.3, pitch: -8, yaw: 15, roll: 4, zoom: 1.2 },
+//   { duration: 1.2 }, // 0 = instant
+// );
+// room_light.moveTo([0.5, -0.4, 0.2], { duration: 1.5 });
+// fire.moveTo([0.5, -0.4, 0.2], { duration: 1.5 }); // animated, returns a Promise
+// fire.moveTo([0, 0, 0], { duration: 0 }); // instant
+// fire.position.set(0.1, 0.2, 0); // also works directly
 
-const room = new Room(document.querySelector("#room"), {
-  lights: [fire, room_light],
-  ambient: 0.3,
+import { PolyRoom, DragControls, FlickerLight } from "./polyroom/index.js";
+
+const room = new PolyRoom(document.querySelector("#room"), {
+  // prevButton: ".my-prev", // selector, element, or list of elements
+  // nextButton: document.querySelector(".my-next"),
+  floor: { color: "#141414", texture: "/images/floor.jpg", tile: 512 },
+  ceiling: { color: "#0c0c0c" }, // or false for pure black
+  lights: [
+    new FlickerLight({
+      position: [0, -0.6, 0],
+      color: "#ff5a14",
+      intensity: 16,
+      radius: 1.3,
+    }),
+  ],
 });
 
 room.setCamera(
-  { x: 0.2, y: 0, z: 0.3, pitch: -8, yaw: 15, roll: 4, zoom: 1.2 },
+  { x: 0, y: 0, z: 0 },
   { duration: 1.2 }, // 0 = instant
 );
-room_light.moveTo([0.5, -0.4, 0.2], { duration: 1.5 });
-fire.moveTo([0.5, -0.4, 0.2], { duration: 1.5 }); // animated, returns a Promise
-fire.moveTo([0, 0, 0], { duration: 0 }); // instant
-fire.position.set(0.1, 0.2, 0); // also works directly
+
+new DragControls(room, {
+  axis: "both", // 'horizontal' | 'vertical' | 'both'
+  // yawLimit: [-40, 40],
+  release: "free", // 'free' | 'spring' | 'snap'
+});
