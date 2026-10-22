@@ -3,6 +3,7 @@ import {
   CSS3DRenderer,
   CSS3DObject,
 } from "three/addons/renderers/CSS3DRenderer.js";
+import { easeInOutCubic } from "./ease.js";
 
 /*
  * Room
@@ -21,8 +22,8 @@ import {
 
 const HALF_PI = Math.PI / 2;
 const mod = (n, m) => ((n % m) + m) % m;
-const easeInOutCubic = (t) =>
-  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const CAM_KEYS = ["x", "y", "z", "pitch", "yaw", "roll", "zoom"];
+const CAM_HOME = { x: 0, y: 0, z: 0, pitch: 0, yaw: 0, roll: 0, zoom: 1 };
 const _rgb = { r: 0, g: 0, b: 0 };
 
 const VERT = /* glsl */ `
@@ -82,6 +83,7 @@ export class Room extends EventTarget {
    * @param {Element} [opts.prevButton]   use your own buttons instead
    * @param {Element} [opts.nextButton]
    * @param {boolean} [opts.swipe=true]   touch swipe
+   * @param {object} [opts.camera]  initial view: { x, y, z, pitch, yaw, roll, zoom } (see setCamera)
    */
   constructor(root, opts = {}) {
     super();
@@ -97,6 +99,7 @@ export class Room extends EventTarget {
       prevButton: null,
       nextButton: null,
       swipe: true,
+      camera: {},
       ...opts,
     };
     this.opts = o;
@@ -116,6 +119,8 @@ export class Room extends EventTarget {
     this.H = 1;
     this.R = 1;
     this._anim = null;
+    this.view = { ...CAM_HOME, ...o.camera }; // runtime camera view (see setCamera)
+    this._camTween = null;
     this._raf = 0;
     this._last = performance.now() / 1000;
     this._slot = new Array(this.count).fill(0);
@@ -270,7 +275,79 @@ export class Room extends EventTarget {
     this.root.classList.remove("room", "is-ready", "is-moving");
   }
 
+  /**
+   * Change the camera view at runtime. Pass any subset of keys.
+   *   x, y, z : position offset from the room centre, in room units (-1..1, same as lights)
+   *   pitch   : degrees, positive looks up
+   *   yaw     : degrees, positive looks left (added on top of the wall you are facing)
+   *   roll    : degrees, tilts the horizon (the sign flips the direction)
+   *   zoom    : 1 = wall fills the screen, >1 closer, <1 further
+   * duration 0 = instant. Returns a Promise that resolves when the change finishes.
+   * Calling again mid-animation starts from the current view (the earlier promise resolves).
+   */
+  setCamera(values = {}, { duration = 0.8, ease = easeInOutCubic } = {}) {
+    this._camTween?.resolve();
+    const to = {};
+    for (const k of CAM_KEYS)
+      if (typeof values[k] === "number") to[k] = values[k];
+    if (duration <= 0) {
+      Object.assign(this.view, to);
+      this._camTween = null;
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      this._camTween = {
+        from: { ...this.view },
+        to,
+        t0: null,
+        duration,
+        ease,
+        resolve,
+      };
+    });
+  }
+
+  getCamera() {
+    return { ...this.view };
+  }
+
+  resetCamera(opts) {
+    return this.setCamera(CAM_HOME, opts);
+  }
+
   // ------------------------------------------------------------ internals
+  _stepCamera(t) {
+    const a = this._camTween;
+    if (!a) return;
+    if (a.t0 === null) a.t0 = t;
+    const k = Math.min((t - a.t0) / a.duration, 1);
+    const e = a.ease(k);
+    for (const key in a.to)
+      this.view[key] = a.from[key] + (a.to[key] - a.from[key]) * e;
+    if (k >= 1) {
+      this._camTween = null;
+      a.resolve();
+    }
+  }
+
+  _applyView() {
+    const v = this.view;
+    const cam = this.camera;
+    const rad = THREE.MathUtils.degToRad;
+    cam.position.set(
+      (v.x * this.R) / 2,
+      (v.y * this.H) / 2,
+      (v.z * this.R) / 2,
+    );
+    cam.rotation.order = "YXZ";
+    cam.rotation.set(rad(v.pitch), this.yaw + rad(v.yaw), rad(v.roll));
+    const zoom = Math.max(0.01, v.zoom);
+    if (cam.zoom !== zoom) {
+      cam.zoom = zoom;
+      cam.updateProjectionMatrix();
+    }
+  }
+
   _assign(step) {
     const c = mod(step, this.count);
     this._slot[c] = mod(step, 4);
@@ -335,11 +412,13 @@ export class Room extends EventTarget {
   _resize() {
     const W = this.root.clientWidth;
     const H = this.root.clientHeight;
+    console.log(W, H);
     if (!W || !H) return;
     // Square room footprint with side R. Camera at the centre (distance R/2 to each wall);
     // vertical FOV is chosen so a wall of height H fills the view exactly: the wall's
     // content (W x H) fills the viewport at rest.
-    const R = Math.max(W, H);
+    // const R = Math.max(W, H);
+    const R = W;
     this.W = W;
     this.H = H;
     this.R = R;
@@ -407,7 +486,8 @@ export class Room extends EventTarget {
       if (k >= 1) this._finishMove();
     }
     this._updateLights(t, dt);
-    this.camera.rotation.y = this.yaw;
+    this._stepCamera(t);
+    this._applyView();
     this.css.render(this.cssScene, this.camera);
     this.gl.render(this.glScene, this.camera);
   }

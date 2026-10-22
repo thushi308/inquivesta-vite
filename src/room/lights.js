@@ -1,4 +1,5 @@
-import { Color, Vector3 } from 'three';
+import { Color, Vector3 } from "three";
+import { easeInOutCubic } from "./ease.js";
 
 /*
  * Room light sources.
@@ -31,7 +32,7 @@ export function noise1(x) {
 export class RoomLight {
   constructor({
     position = [0, 0, 0],
-    color = '#ffffff',
+    color = "#ffffff",
     intensity = 1,
     radius = 1,
     falloff = 2,
@@ -44,6 +45,7 @@ export class RoomLight {
     this.falloff = falloff;
     this.enabled = true;
     this.animate = animate;
+    this._move = null;
     this.output = {
       position: new Vector3(),
       color: new Color(),
@@ -53,8 +55,45 @@ export class RoomLight {
     };
   }
 
+  /**
+   * Move the light to a new position (room units). duration 0 = instant.
+   * Returns a Promise that resolves when the move finishes.
+   */
+  moveTo(position, { duration = 0.8, ease = easeInOutCubic } = {}) {
+    this._move?.resolve();
+    const to = new Vector3(...position);
+    if (duration <= 0) {
+      this.position.copy(to);
+      this._move = null;
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      this._move = {
+        from: this.position.clone(),
+        to,
+        t0: null,
+        duration,
+        ease,
+        resolve,
+      };
+    });
+  }
+
+  _stepMove(time) {
+    const m = this._move;
+    if (!m) return;
+    if (m.t0 === null) m.t0 = time;
+    const k = Math.min((time - m.t0) / m.duration, 1);
+    this.position.lerpVectors(m.from, m.to, m.ease(k));
+    if (k >= 1) {
+      this._move = null;
+      m.resolve();
+    }
+  }
+
   /** Called by the Room every frame. */
   update(time, dt) {
+    this._stepMove(time);
     const o = this.output;
     o.position.copy(this.position);
     o.color.copy(this.color);
@@ -74,14 +113,14 @@ export class RoomLight {
 export class FlickerLight extends RoomLight {
   constructor({
     colorHigh = null, // colour when the flame is at its brightest (defaults to `color`)
-    flicker = 0.35,   // 0..1 intensity variation
-    speed = 6,        // flicker speed
-    jitter = 0.02,    // positional wobble (normalised units)
+    flicker = 0.35, // 0..1 intensity variation
+    speed = 6, // flicker speed
+    jitter = 0.02, // positional wobble (normalised units)
     seed = Math.random() * 100,
     ...rest
   } = {}) {
     super(rest);
-    this.colorHigh = new Color(colorHigh ?? rest.color ?? '#ffffff');
+    this.colorHigh = new Color(colorHigh ?? rest.color ?? "#ffffff");
     this.flicker = flicker;
     this.speed = speed;
     this.jitter = jitter;
@@ -90,7 +129,10 @@ export class FlickerLight extends RoomLight {
 
   modulate(o, time) {
     const t = time * this.speed + this.seed;
-    const n = noise1(t) * 0.6 + noise1(t * 2.3 + 17.3) * 0.3 + noise1(t * 5.1 + 41.7) * 0.1;
+    const n =
+      noise1(t) * 0.6 +
+      noise1(t * 2.3 + 17.3) * 0.3 +
+      noise1(t * 5.1 + 41.7) * 0.1;
     const k = Math.max(-1, Math.min(1, (n - 0.5) * 3));
     o.intensity *= Math.max(0, 1 + this.flicker * k);
     o.radius *= 1 + 0.05 * k * this.flicker;

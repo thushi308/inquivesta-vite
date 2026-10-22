@@ -275,22 +275,32 @@ export const river = createRiver(document.getElementById("river"), {
 /* ----------- Room ---------------------------------------------------- */
 import { Room, FlickerLight, RoomLight } from "./room/index.js";
 
-const room = new Room(document.querySelector("#room"), {
-  lights: [
-    new FlickerLight({
-      position: [0, -0.6, 0], // x, y, z in -1..1 room units
-      color: "#ff5a14",
-      colorHigh: "#ffc36b",
-      intensity: 1.9,
-      radius: 1.3,
-      flicker: 0.2,
-      speed: 2,
-    }),
-    // new RoomLight({
-    //   position: [0, 0, 0],
-    //   color: "#ffffff",
-    //   intensity: 3,
-    //   radius: 1,
-    // }),
-  ],
+let room_light = new RoomLight({
+  position: [0, 0, 0],
+  color: "#ffffff",
+  intensity: 3,
+  radius: 1,
 });
+let fire = new FlickerLight({
+  position: [0, -0.6, 0], // x, y, z in -1..1 room units
+  color: "#ff5a14",
+  colorHigh: "#ffc36b",
+  intensity: 1.9,
+  radius: 1.3,
+  flicker: 0.2,
+  speed: 2,
+});
+
+const room = new Room(document.querySelector("#room"), {
+  lights: [fire, room_light],
+  ambient: 0.3,
+});
+
+room.setCamera(
+  { x: 0.2, y: 0, z: 0.3, pitch: -8, yaw: 15, roll: 4, zoom: 1.2 },
+  { duration: 1.2 }, // 0 = instant
+);
+room_light.moveTo([0.5, -0.4, 0.2], { duration: 1.5 });
+fire.moveTo([0.5, -0.4, 0.2], { duration: 1.5 }); // animated, returns a Promise
+fire.moveTo([0, 0, 0], { duration: 0 }); // instant
+fire.position.set(0.1, 0.2, 0); // also works directly
